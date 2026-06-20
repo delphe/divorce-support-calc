@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/static/css/main.3b7c2144.css",
-    "main.js": "/static/js/main.26f25aca.js",
-    "static/js/453.afb03982.chunk.js": "/static/js/453.afb03982.chunk.js",
-    "index.html": "/index.html",
-    "main.3b7c2144.css.map": "/static/css/main.3b7c2144.css.map",
-    "main.26f25aca.js.map": "/static/js/main.26f25aca.js.map",
-    "453.afb03982.chunk.js.map": "/static/js/453.afb03982.chunk.js.map"
+    "main.css": "/divorce-support-calc/static/css/main.3b7c2144.css",
+    "main.js": "/divorce-support-calc/static/js/main.bc448679.js",
+    "static/js/453.afb03982.chunk.js": "/divorce-support-calc/static/js/453.afb03982.chunk.js",
+    "index.html": "/divorce-support-calc/index.html",
+    "main.3b7c2144.css.map": "/divorce-support-calc/static/css/main.3b7c2144.css.map",
+    "main.bc448679.js.map": "/divorce-support-calc/static/js/main.bc448679.js.map",
+    "453.afb03982.chunk.js.map": "/divorce-support-calc/static/js/453.afb03982.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.3b7c2144.css",
-    "static/js/main.26f25aca.js"
+    "static/js/main.bc448679.js"
   ]
 }
