@@ -1,3 +1,9 @@
+# Divorce Support Calculator
+This application allows you to calculate the support costs for a divorce based on a number of factors. 
+
+## Launch Site
+<https://delphe.github.io/divorce-support-calc/>
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
