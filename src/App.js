@@ -13,13 +13,13 @@ function App() {
   // Recipient factors
   const [recipientEarning, setRecipientEarning] = useState(5);
   const [standardOfLiving, setStandardOfLiving] = useState(5);
-  const [ageOfRecipient, setAgeOfRecipient] = useState(46); // Age slider: 18-75
+  const [ageOfRecipient, setAgeOfRecipient] = useState(45); // Age slider: 18-75
   const [healthOfRecipient, setHealthOfRecipient] = useState(5);
   const [educationNeeded, setEducationNeeded] = useState(5);
   const [childcareResponsibilities, setChildcareResponsibilities] = useState(5);
 
   // Marriage factors
-  const [lengthOfMarriage, setLengthOfMarriage] = useState(1); // Marriage length: 1-40 years
+  const [lengthOfMarriage, setLengthOfMarriage] = useState(7); // Marriage length: 1-40 years
   const [careerSacrifice, setCareerSacrifice] = useState(5);
 
   // Financial factors
@@ -31,16 +31,16 @@ function App() {
 
   // Weights for each factor - lengthOfMarriage increased to 0.20 for legal significance
   const weights = {
-    recipientEarning: 0.12,
-    standardOfLiving: 0.11,
+    recipientEarning: 0.14,
+    standardOfLiving: 0.13,
     lengthOfMarriage: 0.20,      // Significantly increased weight for legal thresholds
-    ageOfRecipient: 0.08,
-    healthOfRecipient: 0.08,
-    careerSacrifice: 0.11,
-    educationNeeded: 0.07,
+    ageOfRecipient: 0.09,
+    healthOfRecipient: 0.09,
+    careerSacrifice: 0.12,
+    educationNeeded: 0.08,
     assetsAwarded: 0.08,
-    payorAbilityToPay: 0.07,
-    childcareResponsibilities: 0.08,
+    payorAbilityToPay: 0.08,
+    childcareResponsibilities: 0.07,
   };
 
   // Weighted marriage length factor reflecting legal thresholds
@@ -76,10 +76,10 @@ function App() {
       standardOfLiving: (standardOfLiving - 5.5) / 4.5,    // High std = higher support
       lengthOfMarriage: getMarriageLengthFactor(lengthOfMarriage),  // Weighted by legal thresholds
       ageOfRecipient: (ageOfRecipient - 46.5) / 28.5,      // Older = higher support (age 18-75, midpoint 46.5)
-      healthOfRecipient: (healthOfRecipient - 5.5) / 4.5,  // Poor health = higher support
+      healthOfRecipient: (5.5 - healthOfRecipient) / 4.5,  // Poor health (low value) = higher support
       careerSacrifice: (careerSacrifice - 5.5) / 4.5,      // Career sacrifice = higher support
       educationNeeded: (educationNeeded - 5.5) / 4.5,      // More education = higher support
-      payorAbilityToPay: (5.5 - payorAbilityToPay) / 4.5,  // Lower ability = lower support
+      payorAbilityToPay: (payorAbilityToPay - 5.5) / 4.5,  // Higher ability to pay = higher support
       childcareResponsibilities: (childcareResponsibilities - 5.5) / 4.5,  // More responsibilities = higher support
       // Note: assetAwarded is applied separately as an independent adjustment
     };
