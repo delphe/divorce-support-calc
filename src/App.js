@@ -19,25 +19,50 @@ function App() {
   const [childcareResponsibilities, setChildcareResponsibilities] = useState(5);
 
   // Marriage factors
-  const [lengthOfMarriage, setLengthOfMarriage] = useState(20); // Marriage length: 1-40 years
+  const [lengthOfMarriage, setLengthOfMarriage] = useState(1); // Marriage length: 1-40 years
   const [careerSacrifice, setCareerSacrifice] = useState(5);
 
   // Financial factors
   const [assetsAwarded, setAssetsAwarded] = useState(0); // Currency value in dollars
   const [payorAbilityToPay, setPayorAbilityToPay] = useState(5);
 
-  // Weights for each factor (slightly higher for earning potential, career sacrifice, and standard of living)
+  // Duration adjustment slider - allows user to shift duration/amount while keeping obligation constant
+  const [adjustedDuration, setAdjustedDuration] = useState(null);
+
+  // Weights for each factor - lengthOfMarriage increased to 0.20 for legal significance
   const weights = {
-    recipientEarning: 0.15,      // Higher weight
-    standardOfLiving: 0.14,      // Higher weight
-    lengthOfMarriage: 0.10,
-    ageOfRecipient: 0.10,
-    healthOfRecipient: 0.09,
-    careerSacrifice: 0.14,       // Higher weight
-    educationNeeded: 0.09,
-    assetsAwarded: 0.10,
-    payorAbilityToPay: 0.09,
-    childcareResponsibilities: 0.10,
+    recipientEarning: 0.12,
+    standardOfLiving: 0.11,
+    lengthOfMarriage: 0.20,      // Significantly increased weight for legal thresholds
+    ageOfRecipient: 0.08,
+    healthOfRecipient: 0.08,
+    careerSacrifice: 0.11,
+    educationNeeded: 0.07,
+    assetsAwarded: 0.08,
+    payorAbilityToPay: 0.07,
+    childcareResponsibilities: 0.08,
+  };
+
+  // Weighted marriage length factor reflecting legal thresholds
+  const getMarriageLengthFactor = (years) => {
+    // Maps marriage length to a factor between -1 and 1
+    // 1-5 years: bottom 20% (-1 to -0.6) - weak support
+    // 5-10 years: 20-45% (-0.6 to -0.1)
+    // 10-16 years: 45-70% (-0.1 to 0.4)
+    // 16-20 years: 70-90% (0.4 to 0.8) - extended duration threshold
+    // 20-40 years: 90-100% (0.8 to 1.0) - substantial support
+    
+    if (years <= 5) {
+      return -1 + (years - 1) / 4 * 0.4;
+    } else if (years <= 10) {
+      return -0.6 + (years - 5) / 5 * 0.5;
+    } else if (years <= 16) {
+      return -0.1 + (years - 10) / 6 * 0.5;
+    } else if (years <= 20) {
+      return 0.4 + (years - 16) / 4 * 0.4;
+    } else {
+      return 0.8 + (years - 20) / 20 * 0.2;
+    }
   };
 
   // Calculate the weighted adjustment factor (sliders only, excluding asset offset)
@@ -49,7 +74,7 @@ function App() {
     const factors = {
       recipientEarning: (5.5 - recipientEarning) / 4.5,    // Low earning = higher support
       standardOfLiving: (standardOfLiving - 5.5) / 4.5,    // High std = higher support
-      lengthOfMarriage: (lengthOfMarriage - 20.5) / 19.5,  // Longer marriage = higher support (1-40, midpoint 20.5)
+      lengthOfMarriage: getMarriageLengthFactor(lengthOfMarriage),  // Weighted by legal thresholds
       ageOfRecipient: (ageOfRecipient - 46.5) / 28.5,      // Older = higher support (age 18-75, midpoint 46.5)
       healthOfRecipient: (healthOfRecipient - 5.5) / 4.5,  // Poor health = higher support
       careerSacrifice: (careerSacrifice - 5.5) / 4.5,      // Career sacrifice = higher support
@@ -106,9 +131,9 @@ function App() {
   // Calculate estimated duration
   const estimatedDuration = useMemo(() => {
     // Factors that extend duration: longer marriage, older age, poor health, low payor ability
-    // Marriage length has extra sensitivity for legally significant thresholds
+    // Marriage length uses weighted factor reflecting legal thresholds
     const durationFactors = {
-      marriage: (lengthOfMarriage - 20.5) / 19.5,
+      marriage: getMarriageLengthFactor(lengthOfMarriage),
       age: (ageOfRecipient - 46.5) / 28.5,
       health: (healthOfRecipient - 5.5) / 4.5,
       payorAbility: (5.5 - payorAbilityToPay) / 4.5,
@@ -128,6 +153,14 @@ function App() {
 
   // Calculate percentage within range for the visual bar
   const percentageInRange = ((estimatedMonthly - lowAmount) / (highAmount - lowAmount)) * 100;
+
+  // Calculate adjusted monthly amount based on duration slider (keeps total obligation constant)
+  const adjustedMonthly = useMemo(() => {
+    if (adjustedDuration === null) return estimatedMonthly;
+    
+    const totalObligation = estimatedMonthly.toFixed(0) * estimatedDuration.toFixed(0);
+    return totalObligation / adjustedDuration;
+  }, [estimatedMonthly, estimatedDuration, adjustedDuration]);
 
   const SliderComponent = ({ label, value, onChange, description }) => (
     <div className="mb-4">
@@ -166,7 +199,7 @@ function App() {
       <div className="mb-4">
         <div className="flex justify-between items-baseline mb-2">
           <label className="block text-sm font-semibold text-gray-700">{label}</label>
-          <span className="text-lg font-bold text-blue-600">{value} years old</span>
+          <span className="text-lg font-bold text-blue-600">{value} {value === 18 ? 'years or younger' : value === 75 ? 'years or older' : 'years old'}</span>
         </div>
         <div className="relative pt-2">
           <input
@@ -223,7 +256,7 @@ function App() {
       <div className="mb-4">
         <div className="flex justify-between items-baseline mb-2">
           <label className="block text-sm font-semibold text-gray-700">{label}</label>
-          <span className="text-lg font-bold text-blue-600">{value} years</span>
+          <span className="text-lg font-bold text-blue-600">{value} {value === 1 ? 'year' : value === 40 ? 'years or longer' : 'years'}</span>
         </div>
         <div className="relative pt-2">
           <input
@@ -334,7 +367,7 @@ function App() {
             Spousal Maintenance Adjustment Tool
           </h1>
           <p className="text-gray-600">
-            Enter results from the Arizona Spousal Maintenance Calculator and adjust factors to refine your estimate
+            Enter results from the <a className="underline text-blue-500" href="https://www.superiorcourt.maricopa.gov/app/selfsuffcalc/" target="_blank">Arizona Spousal Maintenance Calculator</a> and adjust factors to refine your estimate
           </p>
         </div>
 
@@ -494,14 +527,40 @@ function App() {
 
             <div className="bg-white bg-opacity-20 backdrop-blur p-6 rounded-lg">
               <p className="text-blue-100 text-sm font-semibold mb-2">TOTAL OBLIGATION</p>
-              <p className="text-5xl font-bold mb-2">${Math.round(estimatedMonthly * estimatedDuration).toLocaleString('en-US')}</p>
+              <p className="text-5xl font-bold mb-2">${Math.round(estimatedMonthly.toFixed(0) * estimatedDuration.toFixed(0)).toLocaleString('en-US')}</p>
               <p className="text-blue-100 text-xs">
                 Total amount over duration
               </p>
             </div>
           </div>
 
-          {/* Visual Range Indicator */}
+          {/* Duration Adjustment Slider */}
+          <div className="mb-6">
+            <div className="flex justify-between items-baseline mb-3">
+              <label className="block text-sm font-semibold text-blue-100">Adjust Duration (Maintains Total Obligation)</label>
+              <span className="text-lg font-bold text-yellow-300">{(adjustedDuration !== null ? adjustedDuration : estimatedDuration).toFixed(0)} mo</span>
+            </div>
+            <div className="relative">
+              <input
+                type="range"
+                min={lowDuration}
+                max={highDuration}
+                value={adjustedDuration !== null ? adjustedDuration : estimatedDuration}
+                onChange={(e) => setAdjustedDuration(Number(e.target.value))}
+                className="w-full h-2 bg-white bg-opacity-30 rounded-lg appearance-none cursor-pointer accent-yellow-300"
+              />
+              <div className="flex justify-between text-xs text-blue-100 mt-2">
+                <span>{lowDuration} mo</span>
+                <span>{highDuration} mo</span>
+              </div>
+            </div>
+            <p className="text-xs text-blue-100 mt-2">
+              Adjusted Monthly: <span className="font-semibold">${adjustedMonthly.toFixed(0)}</span> 
+              {adjustedDuration !== null && adjustedMonthly !== estimatedMonthly && 
+                <span className="ml-2">(Estimated: ${estimatedMonthly.toFixed(0)})</span>
+              }
+            </p>
+          </div>
           <div className="mb-4">
             <p className="text-sm font-semibold mb-2">Position in Range</p>
             <div className="w-full bg-white bg-opacity-30 rounded-full h-3 overflow-hidden">
