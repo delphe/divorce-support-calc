@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import './App.css';
 
 function App() {
@@ -29,18 +30,58 @@ function App() {
   // Duration adjustment slider - allows user to shift duration/amount while keeping obligation constant
   const [adjustedDuration, setAdjustedDuration] = useState(null);
 
-  // Weights for each factor - lengthOfMarriage increased to 0.20 for legal significance
-  const weights = {
+  // Default weights
+  const DEFAULT_WEIGHTS = {
     recipientEarning: 0.14,
     standardOfLiving: 0.13,
-    lengthOfMarriage: 0.20,      // Significantly increased weight for legal thresholds
+    lengthOfMarriage: 0.20,
     ageOfRecipient: 0.09,
     healthOfRecipient: 0.09,
     careerSacrifice: 0.12,
     educationNeeded: 0.08,
-    assetsAwarded: 0.08,
     payorAbilityToPay: 0.08,
     childcareResponsibilities: 0.07,
+  };
+
+  const WEIGHT_LABELS = {
+    recipientEarning: 'Earning Potential',
+    standardOfLiving: 'Standard of Living',
+    lengthOfMarriage: 'Length of Marriage',
+    ageOfRecipient: 'Age of Recipient',
+    healthOfRecipient: 'Health of Recipient',
+    careerSacrifice: 'Career Sacrifice',
+    educationNeeded: 'Education Needed',
+    payorAbilityToPay: "Payor's Ability to Pay",
+    childcareResponsibilities: 'Childcare Responsibilities',
+  };
+
+  const DONUT_COLORS = [
+    '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B',
+    '#EF4444', '#06B6D4', '#84CC16', '#F97316', '#EC4899'
+  ];
+
+  // Dynamic weights state
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
+  const [showWeightsPanel, setShowWeightsPanel] = useState(false);
+
+  // Adjust one weight and redistribute the remainder proportionally
+  const handleWeightChange = (key, newValue) => {
+    const clamped = Math.max(0.02, Math.min(0.40, newValue));
+    const delta = clamped - weights[key];
+    const otherKeys = Object.keys(weights).filter(k => k !== key);
+    const otherTotal = otherKeys.reduce((sum, k) => sum + weights[k], 0);
+
+    const newWeights = { ...weights, [key]: clamped };
+    otherKeys.forEach(k => {
+      const proportion = weights[k] / otherTotal;
+      newWeights[k] = Math.max(0.02, weights[k] - delta * proportion);
+    });
+
+    // Normalize to exactly 1.0
+    const total = Object.values(newWeights).reduce((s, v) => s + v, 0);
+    Object.keys(newWeights).forEach(k => { newWeights[k] = newWeights[k] / total; });
+
+    setWeights(newWeights);
   };
 
   // Weighted marriage length factor reflecting legal thresholds
@@ -93,7 +134,7 @@ function App() {
   }, [
     recipientEarning, standardOfLiving, lengthOfMarriage, ageOfRecipient,
     healthOfRecipient, careerSacrifice, educationNeeded,
-    payorAbilityToPay, childcareResponsibilities
+    payorAbilityToPay, childcareResponsibilities, weights
   ]);
 
   // Calculate estimated monthly amount with separate asset offset adjustment
@@ -358,6 +399,127 @@ function App() {
     );
   };
 
+  // Donut chart data
+  const donutData = Object.keys(weights).map((key, i) => ({
+    name: WEIGHT_LABELS[key],
+    value: Math.round(weights[key] * 100),
+    color: DONUT_COLORS[i],
+    key,
+  }));
+
+  const WeightsPanel = () => (
+    <div className="mb-8">
+      <button
+        onClick={() => setShowWeightsPanel(v => !v)}
+        className="flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors mb-4"
+      >
+        <span>{showWeightsPanel ? '▼' : '▶'}</span>
+        Customize Factor Weights
+      </button>
+
+      {showWeightsPanel && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+          <div className="flex flex-col md:flex-row gap-8">
+
+            {/* Sliders column */}
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Factor Weights</h3>
+                <button
+                  onClick={() => setWeights(DEFAULT_WEIGHTS)}
+                  className="text-xs text-gray-500 hover:text-indigo-600 underline transition-colors"
+                >
+                  Reset to defaults
+                </button>
+              </div>
+
+              {Object.keys(weights).map((key, i) => {
+                const pct = Math.round(weights[key] * 100);
+                const defaultPct = Math.round(DEFAULT_WEIGHTS[key] * 100);
+                const isAbove = pct > defaultPct;
+                const isBelow = pct < defaultPct;
+                const dotColor = isAbove ? DONUT_COLORS[i] : isBelow ? '#9CA3AF' : '#6B7280';
+
+                return (
+                  <div key={key} className="mb-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-medium text-gray-700">{WEIGHT_LABELS[key]}</label>
+                      <span
+                        className="text-xs font-bold w-8 text-right"
+                        style={{ color: dotColor }}
+                      >
+                        {pct}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="2"
+                      max="40"
+                      value={pct}
+                      onChange={(e) => handleWeightChange(key, Number(e.target.value) / 100)}
+                      className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                      style={{ accentColor: DONUT_COLORS[i] }}
+                    />
+                  </div>
+                );
+              })}
+
+              <div className="mt-4 pt-3 border-t border-gray-300 flex justify-between text-xs text-gray-500">
+                <span>Total</span>
+                <span className="font-bold text-green-600">
+                  {Object.values(weights).reduce((s, v) => s + Math.round(v * 100), 0)}%
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Min 2% · Max 40% per factor. Other weights adjust automatically.
+              </p>
+            </div>
+
+            {/* Donut chart column */}
+            <div className="md:w-64 flex flex-col items-center">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-2">Weight Distribution</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={donutData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {donutData.map((entry) => (
+                      <Cell key={entry.key} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name) => [`${value}%`, name]}
+                    contentStyle={{ fontSize: '11px', borderRadius: '6px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* Legend */}
+              <div className="w-full mt-2 space-y-1">
+                {donutData.map((entry) => (
+                  <div key={entry.key} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span className="flex-1">{entry.name}</span>
+                    <span className="font-semibold">{entry.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8">
@@ -426,6 +588,8 @@ function App() {
         {/* Sliders Section */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 mb-6">Step 2: Adjust Supporting Factors</h2>
+
+          <WeightsPanel />
 
           {/* Recipient Factors */}
           <div className="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded">
