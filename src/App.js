@@ -130,13 +130,13 @@ function App() {
 
   // Calculate estimated duration
   const estimatedDuration = useMemo(() => {
-    // Factors that extend duration: longer marriage, older age, poor health, low payor ability
+    // Factors that extend duration: longer marriage, older age, poor health, high payor ability
     // Marriage length uses weighted factor reflecting legal thresholds
     const durationFactors = {
       marriage: getMarriageLengthFactor(lengthOfMarriage),
       age: (ageOfRecipient - 46.5) / 28.5,
-      health: (healthOfRecipient - 5.5) / 4.5,
-      payorAbility: (5.5 - payorAbilityToPay) / 4.5,
+      health: (5.5 - healthOfRecipient) / 4.5,
+      payorAbility: (payorAbilityToPay - 5.5) / 4.5,
     };
 
     const weightedDuration = (durationFactors.marriage * 0.5 + 
