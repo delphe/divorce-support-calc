@@ -63,26 +63,10 @@ function App() {
   // Dynamic weights state
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const [showWeightsPanel, setShowWeightsPanel] = useState(false);
+  // Tracks keys where the user has manually moved the slider, bypassing auto-overrides
+  const [manualOverrides, setManualOverrides] = useState(new Set());
 
-  // Adjust one weight and redistribute the remainder proportionally
-  const handleWeightChange = (key, newValue) => {
-    const clamped = Math.max(0.02, Math.min(0.40, newValue));
-    const delta = clamped - weights[key];
-    const otherKeys = Object.keys(weights).filter(k => k !== key);
-    const otherTotal = otherKeys.reduce((sum, k) => sum + weights[k], 0);
-
-    const newWeights = { ...weights, [key]: clamped };
-    otherKeys.forEach(k => {
-      const proportion = weights[k] / otherTotal;
-      newWeights[k] = Math.max(0.02, weights[k] - delta * proportion);
-    });
-
-    // Normalize to exactly 1.0
-    const total = Object.values(newWeights).reduce((s, v) => s + v, 0);
-    Object.keys(newWeights).forEach(k => { newWeights[k] = newWeights[k] / total; });
-
-    setWeights(newWeights);
-  };
+  // handleWeightChange is defined after effectiveWeights below so it can reference it
 
   // Weighted marriage length factor reflecting legal thresholds
   const getMarriageLengthFactor = (years) => {
@@ -106,35 +90,94 @@ function App() {
     }
   };
 
+  // Compute effective weights — applies automatic overrides when factors are near-determinative.
+  // The override sets a MINIMUM floor, not a fixed value — if the user manually sets a weight
+  // higher than the boost floor, their value is used. If they set it lower, the floor applies.
+  const effectiveWeights = useMemo(() => {
+    const ew = { ...weights };
+
+    const applyBoost = (key, boostFloor) => {
+      // Skip if user has manually taken control of this key
+      if (manualOverrides.has(key)) return;
+      if (ew[key] >= boostFloor) return;
+      const excess = boostFloor - ew[key];
+      const otherKeys = Object.keys(ew).filter(k => k !== key);
+      const otherTotal = otherKeys.reduce((s, k) => s + ew[k], 0);
+      otherKeys.forEach(k => { ew[k] = Math.max(0.02, ew[k] - excess * (ew[k] / otherTotal)); });
+      ew[key] = boostFloor;
+      const total = Object.values(ew).reduce((s, v) => s + v, 0);
+      Object.keys(ew).forEach(k => { ew[k] /= total; });
+    };
+
+    if (healthOfRecipient >= 9)         applyBoost('healthOfRecipient', 0.20);
+    if (ageOfRecipient >= 67)           applyBoost('ageOfRecipient', 0.15);
+    if (childcareResponsibilities >= 9) applyBoost('childcareResponsibilities', 0.16);
+
+    return ew;
+  }, [weights, healthOfRecipient, ageOfRecipient, childcareResponsibilities, manualOverrides]);
+
+  // Build override summary for warning messages — maps key → { boostedTo, originalDefault }
+  const overrideInfo = useMemo(() => {
+    const info = {};
+    if (healthOfRecipient >= 9 && weights.healthOfRecipient < 0.20 && !manualOverrides.has('healthOfRecipient'))
+      info.healthOfRecipient = { boostedTo: Math.round(effectiveWeights.healthOfRecipient * 100) };
+    if (ageOfRecipient >= 67 && weights.ageOfRecipient < 0.15 && !manualOverrides.has('ageOfRecipient'))
+      info.ageOfRecipient = { boostedTo: Math.round(effectiveWeights.ageOfRecipient * 100) };
+    if (childcareResponsibilities >= 9 && weights.childcareResponsibilities < 0.16 && !manualOverrides.has('childcareResponsibilities'))
+      info.childcareResponsibilities = { boostedTo: Math.round(effectiveWeights.childcareResponsibilities * 100) };
+    return info;
+  }, [effectiveWeights, weights, healthOfRecipient, ageOfRecipient, childcareResponsibilities, manualOverrides]);
+
+  // Adjust one weight and redistribute the remainder proportionally.
+  // Operates against effectiveWeights as the baseline so override-affected sliders respond correctly.
+  const handleWeightChange = (key, newValue) => {
+    const clamped = Math.max(0.02, Math.min(0.40, newValue));
+    const delta = clamped - weights[key];
+    const otherKeys = Object.keys(weights).filter(k => k !== key);
+    const otherTotal = otherKeys.reduce((sum, k) => sum + weights[k], 0);
+
+    const newWeights = { ...weights, [key]: clamped };
+    otherKeys.forEach(k => {
+      const proportion = weights[k] / otherTotal;
+      newWeights[k] = Math.max(0.02, weights[k] - delta * proportion);
+    });
+
+    const total = Object.values(newWeights).reduce((s, v) => s + v, 0);
+    Object.keys(newWeights).forEach(k => { newWeights[k] = newWeights[k] / total; });
+
+    // Mark this key as manually controlled so auto-override no longer floors it
+    setManualOverrides(prev => new Set([...prev, key]));
+    setWeights(newWeights);
+  };
+
   // Calculate the weighted adjustment factor (sliders only, excluding asset offset)
   const adjustmentFactor = useMemo(() => {
     // Convert slider values (1-10) to adjustment factors (-1 to 1)
     // For factors where higher values = higher support, we normalize as: (value - 5.5) / 4.5
     // For factors where higher values = lower support, we invert: (5.5 - value) / 4.5
-    
+
     const factors = {
-      recipientEarning: (5.5 - recipientEarning) / 4.5,    // Low earning = higher support
-      standardOfLiving: (standardOfLiving - 5.5) / 4.5,    // High std = higher support
-      lengthOfMarriage: getMarriageLengthFactor(lengthOfMarriage),  // Weighted by legal thresholds
-      ageOfRecipient: (ageOfRecipient - 46.5) / 28.5,      // Older = higher support (age 18-75, midpoint 46.5)
-      healthOfRecipient: (5.5 - healthOfRecipient) / 4.5,  // Poor health (low value) = higher support
-      careerSacrifice: (careerSacrifice - 5.5) / 4.5,      // Career sacrifice = higher support
-      educationNeeded: (educationNeeded - 5.5) / 4.5,      // More education = higher support
-      payorAbilityToPay: (payorAbilityToPay - 5.5) / 4.5,  // Higher ability to pay = higher support
-      childcareResponsibilities: (childcareResponsibilities - 5.5) / 4.5,  // More responsibilities = higher support
-      // Note: assetAwarded is applied separately as an independent adjustment
+      recipientEarning: (5.5 - recipientEarning) / 4.5,
+      standardOfLiving: (standardOfLiving - 5.5) / 4.5,
+      lengthOfMarriage: getMarriageLengthFactor(lengthOfMarriage),
+      ageOfRecipient: (ageOfRecipient - 46.5) / 28.5,
+      healthOfRecipient: (5.5 - healthOfRecipient) / 4.5,  // Low value = poor health = higher support
+      careerSacrifice: (careerSacrifice - 5.5) / 4.5,
+      educationNeeded: (educationNeeded - 5.5) / 4.5,
+      payorAbilityToPay: (payorAbilityToPay - 5.5) / 4.5,
+      childcareResponsibilities: (childcareResponsibilities - 5.5) / 4.5,
     };
 
     let weightedFactor = 0;
     for (const [key, value] of Object.entries(factors)) {
-      weightedFactor += value * weights[key];
+      weightedFactor += value * effectiveWeights[key];
     }
 
     return Math.max(-1, Math.min(1, weightedFactor));
   }, [
     recipientEarning, standardOfLiving, lengthOfMarriage, ageOfRecipient,
     healthOfRecipient, careerSacrifice, educationNeeded,
-    payorAbilityToPay, childcareResponsibilities, weights
+    payorAbilityToPay, childcareResponsibilities, effectiveWeights
   ]);
 
   // Calculate estimated monthly amount with separate asset offset adjustment
@@ -171,26 +214,34 @@ function App() {
 
   // Calculate estimated duration
   const estimatedDuration = useMemo(() => {
-    // Factors that extend duration: longer marriage, older age, poor health, high payor ability
-    // Marriage length uses weighted factor reflecting legal thresholds
+    // Duration is influenced by how long it will realistically take the recipient to become self-sufficient.
+    // Marriage length is the dominant legal driver; age and health extend duration when re-entry is harder;
+    // low earning potential and high education needed both extend the time to self-sufficiency;
+    // payor ability has a modest moderating effect.
     const durationFactors = {
-      marriage: getMarriageLengthFactor(lengthOfMarriage),
-      age: (ageOfRecipient - 46.5) / 28.5,
-      health: (5.5 - healthOfRecipient) / 4.5,
-      payorAbility: (payorAbilityToPay - 5.5) / 4.5,
+      marriage: getMarriageLengthFactor(lengthOfMarriage),          // 0.45 weight
+      age: (ageOfRecipient - 46.5) / 28.5,                          // 0.20 weight
+      health: (5.5 - healthOfRecipient) / 4.5,                      // 0.15 weight
+      earning: (5.5 - recipientEarning) / 4.5,                      // 0.10 weight — low earning = longer to self-sufficiency
+      education: (educationNeeded - 5.5) / 4.5,                     // 0.07 weight — more training needed = longer duration
+      payorAbility: (payorAbilityToPay - 5.5) / 4.5,               // 0.03 weight
     };
 
-    const weightedDuration = (durationFactors.marriage * 0.5 + 
-                             durationFactors.age * 0.25 + 
-                             durationFactors.health * 0.15 + 
-                             durationFactors.payorAbility * 0.1);
+    const weightedDuration = (
+      durationFactors.marriage    * 0.45 +
+      durationFactors.age         * 0.20 +
+      durationFactors.health      * 0.15 +
+      durationFactors.earning     * 0.10 +
+      durationFactors.education   * 0.07 +
+      durationFactors.payorAbility * 0.03
+    );
 
     const durationRange = highDuration - lowDuration;
     const adjustment = (weightedDuration * durationRange) / 2;
     const estimate = lowDuration + (durationRange / 2) + adjustment;
 
     return Math.max(lowDuration, Math.min(highDuration, estimate));
-  }, [lengthOfMarriage, ageOfRecipient, healthOfRecipient, payorAbilityToPay, lowDuration, highDuration]);
+  }, [lengthOfMarriage, ageOfRecipient, healthOfRecipient, recipientEarning, educationNeeded, payorAbilityToPay, lowDuration, highDuration]);
 
   // Calculate percentage within range for the visual bar
   const percentageInRange = ((estimatedMonthly - lowAmount) / (highAmount - lowAmount)) * 100;
@@ -203,31 +254,47 @@ function App() {
     return totalObligation / adjustedDuration;
   }, [estimatedMonthly, estimatedDuration, adjustedDuration]);
 
-  const SliderComponent = ({ label, value, onChange, description }) => (
-    <div className="mb-4">
-      <div className="flex justify-between items-baseline mb-2">
-        <label className="block text-sm font-semibold text-gray-700">{label}</label>
-        <span className="text-lg font-bold text-blue-600">{value}</span>
-      </div>
-      <div className="group relative">
-        <input
-          type="range"
-          min="1"
-          max="10"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-        <div className="absolute left-0 right-0 flex justify-between text-xs text-gray-500 mt-1 px-1">
-          <span>1 (Low)</span>
-          <span>10 (High)</span>
+  const SliderComponent = ({ label, value, onChange, description, rationale, warning }) => {
+    const showWarning = warning && value >= warning.threshold;
+    return (
+      <div className="mb-5">
+        <div className="flex justify-between items-baseline mb-2">
+          <label className="block text-sm font-semibold text-gray-700">{label}</label>
+          <span className="text-lg font-bold text-blue-600">{value}</span>
         </div>
+        <div className="group relative">
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+          <div className="absolute left-0 right-0 flex justify-between text-xs text-gray-500 mt-1 px-1">
+            <span>1 (Low)</span>
+            <span>10 (High)</span>
+          </div>
+        </div>
+        <p className="text-xs text-gray-600 mt-6">{description}</p>
+        {rationale && (
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+            <span className="font-semibold">Why this weight: </span>{rationale}
+          </p>
+        )}
+        {showWarning && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Weight override applied: </span>{warning.message}
+            </p>
+          </div>
+        )}
       </div>
-      <p className="text-xs text-gray-600 mt-6">{description}</p>
-    </div>
-  );
+    );
+  };
 
-  const AgeSliderComponent = ({ label, value, onChange, description }) => {
+  const AgeSliderComponent = ({ label, value, onChange, description, rationale, warning }) => {
     const totalRange = 75 - 18;
     const markerAges = [35, 50, 67];
     const markers = markerAges.map(age => ({
@@ -280,11 +347,24 @@ function App() {
           <span>75</span>
         </div>
         <p className="text-xs text-gray-600 mt-2">{description}</p>
+        {rationale && (
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+            <span className="font-semibold">Why this weight: </span>{rationale}
+          </p>
+        )}
+        {warning && value >= warning.threshold && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Weight override applied: </span>{warning.message}
+            </p>
+          </div>
+        )}
       </div>
     );
   };
 
-  const MarriageSliderComponent = ({ label, value, onChange, description }) => {
+  const MarriageSliderComponent = ({ label, value, onChange, description, rationale, warning }) => {
     const totalRange = 40 - 1;
     const markerYears = [5, 10, 16, 20];
     const markers = markerYears.map(years => ({
@@ -337,6 +417,19 @@ function App() {
           <span>40</span>
         </div>
         <p className="text-xs text-gray-600 mt-2">{description}</p>
+        {rationale && (
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+            <span className="font-semibold">Why this weight: </span>{rationale}
+          </p>
+        )}
+        {warning && value >= warning.threshold && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Weight override applied: </span>{warning.message}
+            </p>
+          </div>
+        )}
       </div>
     );
   };
@@ -399,12 +492,13 @@ function App() {
     );
   };
 
-  // Donut chart data
-  const donutData = Object.keys(weights).map((key, i) => ({
+  // Donut chart data — uses effectiveWeights so overrides are visible in the chart
+  const donutData = Object.keys(effectiveWeights).map((key, i) => ({
     name: WEIGHT_LABELS[key],
-    value: Math.round(weights[key] * 100),
+    value: Math.round(effectiveWeights[key] * 100),
     color: DONUT_COLORS[i],
     key,
+    isOverridden: !!overrideInfo[key],
   }));
 
   const WeightsPanel = () => (
@@ -426,7 +520,7 @@ function App() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Factor Weights</h3>
                 <button
-                  onClick={() => setWeights(DEFAULT_WEIGHTS)}
+                  onClick={() => { setWeights(DEFAULT_WEIGHTS); setManualOverrides(new Set()); }}
                   className="text-xs text-gray-500 hover:text-indigo-600 underline transition-colors"
                 >
                   Reset to defaults
@@ -434,40 +528,59 @@ function App() {
               </div>
 
               {Object.keys(weights).map((key, i) => {
-                const pct = Math.round(weights[key] * 100);
+                const basePct = Math.round(weights[key] * 100);
+                const effectivePct = Math.round(effectiveWeights[key] * 100);
                 const defaultPct = Math.round(DEFAULT_WEIGHTS[key] * 100);
-                const isAbove = pct > defaultPct;
-                const isBelow = pct < defaultPct;
-                const dotColor = isAbove ? DONUT_COLORS[i] : isBelow ? '#9CA3AF' : '#6B7280';
+                const isOverridden = !!overrideInfo[key];
+                const isAbove = effectivePct > defaultPct;
+                const isBelow = effectivePct < defaultPct;
+                const dotColor = isOverridden ? '#F59E0B' : isAbove ? DONUT_COLORS[i] : isBelow ? '#9CA3AF' : '#6B7280';
 
                 return (
                   <div key={key} className="mb-3">
                     <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-medium text-gray-700">{WEIGHT_LABELS[key]}</label>
-                      <span
-                        className="text-xs font-bold w-8 text-right"
-                        style={{ color: dotColor }}
-                      >
-                        {pct}%
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-medium text-gray-700">{WEIGHT_LABELS[key]}</label>
+                        {isOverridden && (
+                          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded px-1.5 py-0.5 font-semibold leading-none">
+                            ⚡ Floor: {effectivePct}%
+                          </span>
+                        )}
+                        {manualOverrides.has(key) && !isOverridden && (
+                          <button
+                            onClick={() => setManualOverrides(prev => { const n = new Set(prev); n.delete(key); return n; })}
+                            className="text-xs text-indigo-500 underline hover:text-indigo-700"
+                          >
+                            Restore auto
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold w-12 text-right" style={{ color: dotColor }}>
+                        {effectivePct}%
                       </span>
                     </div>
                     <input
                       type="range"
                       min="2"
                       max="40"
-                      value={pct}
+                      value={effectivePct}
                       onChange={(e) => handleWeightChange(key, Number(e.target.value) / 100)}
                       className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
-                      style={{ accentColor: DONUT_COLORS[i] }}
+                      style={{ accentColor: isOverridden ? '#F59E0B' : DONUT_COLORS[i] }}
                     />
+                    {isOverridden && basePct < effectivePct && (
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Auto-override active (floor: {effectivePct}%). Drag right to take manual control.
+                      </p>
+                    )}
                   </div>
                 );
               })}
 
               <div className="mt-4 pt-3 border-t border-gray-300 flex justify-between text-xs text-gray-500">
-                <span>Total</span>
+                <span>Total (effective)</span>
                 <span className="font-bold text-green-600">
-                  {Object.values(weights).reduce((s, v) => s + Math.round(v * 100), 0)}%
+                  {Object.values(effectiveWeights).reduce((s, v) => s + Math.round(v * 100), 0)}%
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
@@ -526,7 +639,7 @@ function App() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Divorce Support Calculator
+            Spousal Maintenance Adjustment Tool
           </h1>
           <p className="text-gray-600">
             Enter results from the <a className="underline text-blue-500" href="https://www.superiorcourt.maricopa.gov/app/selfsuffcalc/" target="_blank">Arizona Spousal Maintenance Calculator</a> and adjust factors to refine your estimate
@@ -598,25 +711,41 @@ function App() {
               label="Earning Potential of Recipient"
               value={recipientEarning}
               onChange={setRecipientEarning}
-              description="Low earning potential → Higher support | High earning potential → Lower support"
+              description="Low earning potential → Higher support amount & longer duration | High earning potential → Lower support amount & shorter duration"
+              rationale="Weighted at 14% — the highest of any single factor — because Arizona spousal maintenance is explicitly designed around self-sufficiency. Courts focus primarily on whether the recipient can support themselves, making this the most direct measure of ongoing need. A recipient with strong earning potential is expected to become self-sufficient quickly, reducing both the amount and duration of support."
             />
             <AgeSliderComponent
               label="Age of Recipient"
               value={ageOfRecipient}
               onChange={setAgeOfRecipient}
               description="Older age (harder to re-enter workforce) → Higher support | Younger age → Lower support"
+              rationale="Weighted at 9% because age is an important but secondary factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Its legal significance increases significantly past 50 and again at 67 when Social Security and retirement income attribution rules shift."
+              warning={{
+                threshold: 67,
+                message: `Recipient is at or near full retirement age (67). At this age, Arizona guidelines shift how retirement and Social Security income is attributed, and courts often treat re-employment as unrealistic. This factor's effective weight has been automatically increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 15}% (from ${Math.round(weights.ageOfRecipient * 100)}%) to reflect that near-retirement age is frequently near-determinative in judicial decisions.`
+              }}
             />
             <SliderComponent
               label="Health of Recipient"
               value={healthOfRecipient}
               onChange={setHealthOfRecipient}
-              description="Poor health → Higher support | Good health → Lower support"
+              description="Poor health (low value) → Higher support | Good health → Lower support"
+              rationale="Weighted at 9% under normal circumstances because health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 9–10), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case under A.R.S. § 25-319, and the weight is automatically increased to reflect this."
+              warning={{
+                threshold: 9,
+                message: `Severe health issues indicated. When health significantly limits or eliminates the recipient's ability to work, Arizona courts treat this as near-determinative rather than just one factor among many. The effective weight of this factor has been automatically increased to ${overrideInfo.healthOfRecipient ? overrideInfo.healthOfRecipient.boostedTo : 20}% (from ${Math.round(weights.healthOfRecipient * 100)}%) in the calculation to reflect its outsized legal significance at this level. Consider consulting an attorney about whether a permanent or long-term maintenance order may be appropriate.`
+              }}
             />
             <SliderComponent
               label="Childcare Responsibilities"
               value={childcareResponsibilities}
               onChange={setChildcareResponsibilities}
-              description="High childcare (limiting work) → Higher support | Low childcare → Lower support"
+              description="High childcare responsibilities limiting work → Higher support | Low responsibilities → Lower support"
+              rationale="Weighted at 7% because childcare is relevant but partially captured by other factors like earning potential. Its influence grows significantly when the recipient has primary custody of children under school age, since full-time care of young children can make employment practically impossible. At very high values (9–10), the weight is automatically increased to reflect this near-determinative impact."
+              warning={{
+                threshold: 9,
+                message: `Extensive childcare responsibilities indicated. Primary custody of very young children can severely limit or eliminate a recipient's ability to work, which courts treat as a major constraint on self-sufficiency — not merely a contributing factor. The effective weight of this factor has been automatically increased to ${overrideInfo.childcareResponsibilities ? overrideInfo.childcareResponsibilities.boostedTo : 16}% (from ${Math.round(weights.childcareResponsibilities * 100)}%) in the calculation. This situation may also affect the duration of support, as the need may diminish as children reach school age.`
+              }}
             />
           </div>
 
@@ -628,24 +757,28 @@ function App() {
               value={lengthOfMarriage}
               onChange={setLengthOfMarriage}
               description="Longer marriage → Higher support & duration | Shorter marriage → Lower support & duration. Under 5 years significantly reduces duration."
+              rationale="Weighted at 20% — the highest weight of any factor — because marriage length is the foundational driver of both the amount and duration of spousal maintenance under Arizona law. It underlies several other factors simultaneously: longer marriages involve more career sacrifice, a higher standard of living expectation, and greater dependency. The 2025 guideline revisions specifically increased the maximum duration for marriages over 16 years, reinforcing how central this factor is."
             />
             <SliderComponent
               label="Standard of Living During Marriage"
               value={standardOfLiving}
               onChange={setStandardOfLiving}
               description="Higher standard of living → Higher support | Lower standard → Lower support"
+              rationale="Weighted at 13% because Arizona courts explicitly consider the marital standard of living as the baseline against which support adequacy is measured. In higher-income marriages, courts use it to anchor the award to a lifestyle the recipient reasonably expected to maintain. However, it carries less weight in lower-income marriages where maintaining the exact standard is not realistic for either spouse post-divorce."
             />
             <SliderComponent
               label="Career Sacrifice"
               value={careerSacrifice}
               onChange={setCareerSacrifice}
-              description="Significant career sacrifice → Higher support | Minimal sacrifice → Lower support"
+              description="Significant career sacrifice for the marriage → Higher support | Minimal sacrifice → Lower support"
+              rationale="Weighted at 12% because career sacrifice is one of the clearest equitable justifications for spousal maintenance. A.R.S. § 25-319 specifically names a spouse's contribution to the other's educational or career opportunities as a basis for support. Judges look for concrete evidence — years out of the workforce, forgone degrees, geographic relocations, or reduced hours — and treat documented sacrifice as a strong argument for higher awards."
             />
             <SliderComponent
               label="Education/Training Needed"
               value={educationNeeded}
               onChange={setEducationNeeded}
-              description="More education needed → Higher support | Little needed → Lower support"
+              description="More education or training needed → Higher support amount & longer duration | Little needed → Lower support & shorter duration"
+              rationale="Weighted at 8% for the monthly amount, but also directly influences estimated duration — more training needed means a longer runway to self-sufficiency. Courts may award maintenance specifically to fund a degree or vocational program, after which the expectation is self-sufficiency. This is why education needs tend to affect how long support lasts more than how much is paid each month."
             />
           </div>
 
@@ -656,7 +789,8 @@ function App() {
               label="Payor's Ability to Pay"
               value={payorAbilityToPay}
               onChange={setPayorAbilityToPay}
-              description="Lower ability to pay → Lower support | Higher ability → Higher support"
+              description="Lower ability to pay → Lower support | Higher ability to pay → Higher support"
+              rationale="Weighted at 8% because ability to pay functions more as a ceiling than a linear factor in judicial decisions — a judge will not award more than the payor can reasonably afford regardless of other factors. The relatively modest weight reflects that this constraint typically only becomes decisive when the payor's income is genuinely limited. In higher-income cases it is rarely the determining factor, while in lower-income cases it can cap the award significantly."
             />
             <CurrencyInputComponent
               label="Net Asset Offset"
