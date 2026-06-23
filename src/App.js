@@ -2,6 +2,218 @@ import React, { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import './App.css';
 
+const WeightSliderRow = ({
+  keyName, label, basePct, effectivePct, defaultPct,
+  isOverridden, isManual, dotColor, accentColor,
+  onChangeWeight, onRestoreAuto,
+}) => (
+  <div className="mb-3">
+    <div className="flex justify-between items-center mb-1">
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-medium text-gray-700">{label}</label>
+        {isOverridden && (
+          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded px-1.5 py-0.5 font-semibold leading-none">
+            ⚡ Floor: {effectivePct}%
+          </span>
+        )}
+        {isManual && !isOverridden && (
+          <button
+            onClick={onRestoreAuto}
+            className="text-xs text-indigo-500 underline hover:text-indigo-700"
+          >
+            Restore auto
+          </button>
+        )}
+      </div>
+      <span className="text-xs font-bold w-12 text-right" style={{ color: dotColor }}>
+        {effectivePct}%
+      </span>
+    </div>
+    <input
+      type="range"
+      min="2"
+      max="40"
+      value={effectivePct}
+      onChange={(e) => onChangeWeight(keyName, Number(e.target.value) / 100)}
+      className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+      style={{ accentColor }}
+    />
+    {isOverridden && basePct < effectivePct && (
+      <p className="text-xs text-amber-700 mt-0.5">
+        Auto-override active (floor: {effectivePct}%). Drag right to take manual control.
+      </p>
+    )}
+  </div>
+);
+
+const SliderComp = ({ label, value, onChange, description, rationale, warning }) => {
+  const showWarning = warning && value >= warning.threshold;
+  return (
+    <div className="mb-5">
+      <div className="flex justify-between items-baseline mb-2">
+        <label className="block text-sm font-semibold text-gray-700">{label}</label>
+        <span className="text-lg font-bold text-blue-600">{value}</span>
+      </div>
+      <div className="group relative">
+        <input
+          type="range"
+          min="1"
+          max="10"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+        />
+        <div className="absolute left-0 right-0 flex justify-between text-xs text-gray-500 mt-1 px-1">
+          <span>1 (Low)</span>
+          <span>10 (High)</span>
+        </div>
+      </div>
+      <p className="text-xs text-gray-600 mt-6">{description}</p>
+      {rationale && (
+        <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+          <span className="font-semibold">Calculation: </span>{rationale}
+        </p>
+      )}
+      {showWarning && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+          <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Weight override applied: </span>{warning.message}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AgeSliderComp = ({ label, value, onChange, description, rationale, warning }) => {
+  const totalRange = 75 - 18;
+  const markerAges = [35, 50, 67];
+  const markers = markerAges.map(age => ({
+    age,
+    label: age === 35 ? 'Early' : age === 50 ? 'Mid-Career' : 'Near Retirement',
+    percent: ((age - 18) / totalRange) * 100
+  }));
+
+  return (
+    <div className="mb-4">
+      <div className="flex justify-between items-baseline mb-2">
+        <label className="block text-sm font-semibold text-gray-700">{label}</label>
+        <span className="text-lg font-bold text-blue-600">
+          {value === 18 ? '18 or younger' : value === 75 ? '75 or older' : `${value} years old`}
+        </span>
+      </div>
+      <div className="relative pt-2">
+        <input
+          type="range"
+          min="18"
+          max="75"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+        />
+        <div className="relative -top-1 h-1 w-full">
+          {markers.map((marker) => (
+            <div key={marker.age} className="absolute w-1 h-3 bg-gray-400 transform -translate-x-1/2"
+              style={{ left: `${marker.percent}%` }} />
+          ))}
+        </div>
+        <div className="relative h-5 w-full">
+          {markers.map((marker) => (
+            <div key={`label-${marker.age}`} className="absolute text-xs text-gray-600 transform -translate-x-1/2 mt-1"
+              style={{ left: `${marker.percent}%` }}>
+              <div className="whitespace-nowrap">{marker.age}</div>
+              <div className="text-gray-500 text-xs">{marker.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-between text-xs text-gray-500 mt-10">
+        <span>18</span>
+        <span>75</span>
+      </div>
+      <p className="text-xs text-gray-600 mt-2">{description}</p>
+      {rationale && (
+        <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+          <span className="font-semibold">Calculation: </span>{rationale}
+        </p>
+      )}
+      {warning && value >= warning.threshold && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+          <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Weight override applied: </span>{warning.message}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MarriageSliderComp = ({ label, value, onChange, description, rationale, warning }) => {
+  const totalRange = 40 - 1;
+  const markerYears = [5, 10, 16, 20];
+  const markers = markerYears.map(years => ({
+    years,
+    label: years === 5 ? 'Short-Term' : years === 10 ? 'Established' : years === 16 ? 'Long-Term' : 'Substantial',
+    percent: ((years - 1) / totalRange) * 100
+  }));
+
+  return (
+    <div className="mb-4">
+      <div className="flex justify-between items-baseline mb-2">
+        <label className="block text-sm font-semibold text-gray-700">{label}</label>
+        <span className="text-lg font-bold text-blue-600">
+          {value === 1 ? '1 year' : value === 40 ? '40+ years' : `${value} years`}
+        </span>
+      </div>
+      <div className="relative pt-2">
+        <input
+          type="range"
+          min="1"
+          max="40"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+        />
+        <div className="relative -top-1 h-1 w-full">
+          {markers.map((marker) => (
+            <div key={marker.years} className="absolute w-1 h-3 bg-gray-400 transform -translate-x-1/2"
+              style={{ left: `${marker.percent}%` }} />
+          ))}
+        </div>
+        <div className="relative h-5 w-full">
+          {markers.map((marker) => (
+            <div key={`label-${marker.years}`} className="absolute text-xs text-gray-600 transform -translate-x-1/2 mt-1"
+              style={{ left: `${marker.percent}%` }}>
+              <div className="whitespace-nowrap">{marker.years} yr</div>
+              <div className="text-gray-500 text-xs">{marker.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-between text-xs text-gray-500 mt-10">
+        <span>1</span>
+        <span>40</span>
+      </div>
+      <p className="text-xs text-gray-600 mt-2">{description}</p>
+      {rationale && (
+        <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+          <span className="font-semibold">Calculation: </span>{rationale}
+        </p>
+      )}
+      {warning && value >= warning.threshold && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+          <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Weight override applied: </span>{warning.message}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
   // Input section state
   const [lowAmount, setLowAmount] = useState(1000);
@@ -254,185 +466,9 @@ function App() {
     return totalObligation / adjustedDuration;
   }, [estimatedMonthly, estimatedDuration, adjustedDuration]);
 
-  const SliderComponent = ({ label, value, onChange, description, rationale, warning }) => {
-    const showWarning = warning && value >= warning.threshold;
-    return (
-      <div className="mb-5">
-        <div className="flex justify-between items-baseline mb-2">
-          <label className="block text-sm font-semibold text-gray-700">{label}</label>
-          <span className="text-lg font-bold text-blue-600">{value}</span>
-        </div>
-        <div className="group relative">
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-          />
-          <div className="absolute left-0 right-0 flex justify-between text-xs text-gray-500 mt-1 px-1">
-            <span>1 (Low)</span>
-            <span>10 (High)</span>
-          </div>
-        </div>
-        <p className="text-xs text-gray-600 mt-6">{description}</p>
-        {rationale && (
-          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
-            <span className="font-semibold">Why this weight: </span>{rationale}
-          </p>
-        )}
-        {showWarning && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
-            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
-            <p className="text-xs text-amber-800">
-              <span className="font-semibold">Weight override applied: </span>{warning.message}
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const AgeSliderComponent = ({ label, value, onChange, description, rationale, warning }) => {
-    const totalRange = 75 - 18;
-    const markerAges = [35, 50, 67];
-    const markers = markerAges.map(age => ({
-      age,
-      label: age === 35 ? 'Early' : age === 50 ? 'Mid-Career' : 'Near Retirement',
-      percent: ((age - 18) / totalRange) * 100
-    }));
-
-    return (
-      <div className="mb-4">
-        <div className="flex justify-between items-baseline mb-2">
-          <label className="block text-sm font-semibold text-gray-700">{label}</label>
-          <span className="text-lg font-bold text-blue-600">{value} {value === 18 ? 'years or younger' : value === 75 ? 'years or older' : 'years old'}</span>
-        </div>
-        <div className="relative pt-2">
-          <input
-            type="range"
-            min="18"
-            max="75"
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-          />
-          {/* Tick marks for significant ages */}
-          <div className="relative -top-1 h-1 w-full">
-            {markers.map((marker) => (
-              <div
-                key={marker.age}
-                className="absolute w-1 h-3 bg-gray-400 transform -translate-x-1/2"
-                style={{ left: `${marker.percent}%` }}
-              />
-            ))}
-          </div>
-          {/* Labels for significant ages */}
-          <div className="relative h-5 w-full">
-            {markers.map((marker) => (
-              <div
-                key={`label-${marker.age}`}
-                className="absolute text-xs text-gray-600 transform -translate-x-1/2 mt-1"
-                style={{ left: `${marker.percent}%` }}
-              >
-                <div className="whitespace-nowrap">{marker.age}</div>
-                <div className="text-gray-500 text-xs">{marker.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-10">
-          <span>18</span>
-          <span>75</span>
-        </div>
-        <p className="text-xs text-gray-600 mt-2">{description}</p>
-        {rationale && (
-          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
-            <span className="font-semibold">Why this weight: </span>{rationale}
-          </p>
-        )}
-        {warning && value >= warning.threshold && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
-            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
-            <p className="text-xs text-amber-800">
-              <span className="font-semibold">Weight override applied: </span>{warning.message}
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const MarriageSliderComponent = ({ label, value, onChange, description, rationale, warning }) => {
-    const totalRange = 40 - 1;
-    const markerYears = [5, 10, 16, 20];
-    const markers = markerYears.map(years => ({
-      years,
-      label: years === 5 ? 'Short-Term' : years === 10 ? 'Established' : years === 16 ? 'Long-Term' : 'Substantial',
-      percent: ((years - 1) / totalRange) * 100
-    }));
-
-    return (
-      <div className="mb-4">
-        <div className="flex justify-between items-baseline mb-2">
-          <label className="block text-sm font-semibold text-gray-700">{label}</label>
-          <span className="text-lg font-bold text-blue-600">{value} {value === 1 ? 'year' : value === 40 ? 'years or longer' : 'years'}</span>
-        </div>
-        <div className="relative pt-2">
-          <input
-            type="range"
-            min="1"
-            max="40"
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-          />
-          {/* Tick marks for significant marriage lengths */}
-          <div className="relative -top-1 h-1 w-full">
-            {markers.map((marker) => (
-              <div
-                key={marker.years}
-                className="absolute w-1 h-3 bg-gray-400 transform -translate-x-1/2"
-                style={{ left: `${marker.percent}%` }}
-              />
-            ))}
-          </div>
-          {/* Labels for significant marriage lengths */}
-          <div className="relative h-5 w-full">
-            {markers.map((marker) => (
-              <div
-                key={`label-${marker.years}`}
-                className="absolute text-xs text-gray-600 transform -translate-x-1/2 mt-1"
-                style={{ left: `${marker.percent}%` }}
-              >
-                <div className="whitespace-nowrap">{marker.years} yr</div>
-                <div className="text-gray-500 text-xs">{marker.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-10">
-          <span>1</span>
-          <span>40</span>
-        </div>
-        <p className="text-xs text-gray-600 mt-2">{description}</p>
-        {rationale && (
-          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
-            <span className="font-semibold">Why this weight: </span>{rationale}
-          </p>
-        )}
-        {warning && value >= warning.threshold && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
-            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
-            <p className="text-xs text-amber-800">
-              <span className="font-semibold">Weight override applied: </span>{warning.message}
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
+  const SliderComponent = SliderComp;
+  const AgeSliderComponent = AgeSliderComp;
+  const MarriageSliderComponent = MarriageSliderComp;
 
   const CurrencyInputComponent = ({ label, value, onChange, description, helpText }) => {
     const inputRef = React.useRef(null);
@@ -535,45 +571,21 @@ function App() {
                 const isAbove = effectivePct > defaultPct;
                 const isBelow = effectivePct < defaultPct;
                 const dotColor = isOverridden ? '#F59E0B' : isAbove ? DONUT_COLORS[i] : isBelow ? '#9CA3AF' : '#6B7280';
-
                 return (
-                  <div key={key} className="mb-3">
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-medium text-gray-700">{WEIGHT_LABELS[key]}</label>
-                        {isOverridden && (
-                          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded px-1.5 py-0.5 font-semibold leading-none">
-                            ⚡ Floor: {effectivePct}%
-                          </span>
-                        )}
-                        {manualOverrides.has(key) && !isOverridden && (
-                          <button
-                            onClick={() => setManualOverrides(prev => { const n = new Set(prev); n.delete(key); return n; })}
-                            className="text-xs text-indigo-500 underline hover:text-indigo-700"
-                          >
-                            Restore auto
-                          </button>
-                        )}
-                      </div>
-                      <span className="text-xs font-bold w-12 text-right" style={{ color: dotColor }}>
-                        {effectivePct}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="2"
-                      max="40"
-                      value={effectivePct}
-                      onChange={(e) => handleWeightChange(key, Number(e.target.value) / 100)}
-                      className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
-                      style={{ accentColor: isOverridden ? '#F59E0B' : DONUT_COLORS[i] }}
-                    />
-                    {isOverridden && basePct < effectivePct && (
-                      <p className="text-xs text-amber-700 mt-0.5">
-                        Auto-override active (floor: {effectivePct}%). Drag right to take manual control.
-                      </p>
-                    )}
-                  </div>
+                  <WeightSliderRow
+                    key={key}
+                    keyName={key}
+                    label={WEIGHT_LABELS[key]}
+                    basePct={basePct}
+                    effectivePct={effectivePct}
+                    defaultPct={defaultPct}
+                    isOverridden={isOverridden}
+                    isManual={manualOverrides.has(key)}
+                    dotColor={dotColor}
+                    accentColor={isOverridden ? '#F59E0B' : DONUT_COLORS[i]}
+                    onChangeWeight={handleWeightChange}
+                    onRestoreAuto={() => setManualOverrides(prev => { const n = new Set(prev); n.delete(key); return n; })}
+                  />
                 );
               })}
 
@@ -722,7 +734,7 @@ function App() {
               rationale="Weighted at 9% because age is an important but secondary factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Its legal significance increases significantly past 50 and again at 67 when Social Security and retirement income attribution rules shift."
               warning={{
                 threshold: 67,
-                message: `Recipient is at or near full retirement age (67). At this age, Arizona guidelines shift how retirement and Social Security income is attributed, and courts often treat re-employment as unrealistic. This factor's effective weight has been automatically increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 15}% (from ${Math.round(weights.ageOfRecipient * 100)}%) to reflect that near-retirement age is frequently near-determinative in judicial decisions.`
+                message: `Weight increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 15}% — re-employment at this age is typically treated as unrealistic by courts, making this factor near-determinative.`
               }}
             />
             <SliderComponent
@@ -733,7 +745,7 @@ function App() {
               rationale="Weighted at 9% under normal circumstances because health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 9–10), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case under A.R.S. § 25-319, and the weight is automatically increased to reflect this."
               warning={{
                 threshold: 9,
-                message: `Severe health issues indicated. When health significantly limits or eliminates the recipient's ability to work, Arizona courts treat this as near-determinative rather than just one factor among many. The effective weight of this factor has been automatically increased to ${overrideInfo.healthOfRecipient ? overrideInfo.healthOfRecipient.boostedTo : 20}% (from ${Math.round(weights.healthOfRecipient * 100)}%) in the calculation to reflect its outsized legal significance at this level. Consider consulting an attorney about whether a permanent or long-term maintenance order may be appropriate.`
+                message: `Weight increased to ${overrideInfo.healthOfRecipient ? overrideInfo.healthOfRecipient.boostedTo : 20}% — severe health limitations are treated as near-determinative. Consult an attorney about whether a long-term or permanent order may apply.`
               }}
             />
             <SliderComponent
@@ -744,7 +756,7 @@ function App() {
               rationale="Weighted at 7% because childcare is relevant but partially captured by other factors like earning potential. Its influence grows significantly when the recipient has primary custody of children under school age, since full-time care of young children can make employment practically impossible. At very high values (9–10), the weight is automatically increased to reflect this near-determinative impact."
               warning={{
                 threshold: 9,
-                message: `Extensive childcare responsibilities indicated. Primary custody of very young children can severely limit or eliminate a recipient's ability to work, which courts treat as a major constraint on self-sufficiency — not merely a contributing factor. The effective weight of this factor has been automatically increased to ${overrideInfo.childcareResponsibilities ? overrideInfo.childcareResponsibilities.boostedTo : 16}% (from ${Math.round(weights.childcareResponsibilities * 100)}%) in the calculation. This situation may also affect the duration of support, as the need may diminish as children reach school age.`
+                message: `Weight increased to ${overrideInfo.childcareResponsibilities ? overrideInfo.childcareResponsibilities.boostedTo : 16}% — primary custody of young children severely limits employment and courts treat this as a major self-sufficiency constraint. Duration may shorten as children reach school age.`
               }}
             />
           </div>
