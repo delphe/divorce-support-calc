@@ -196,7 +196,11 @@ const WeightsPanel = React.memo(({
 });
 
 const SliderComp = ({ label, value, onChange, description, rationale, warning }) => {
-  const showWarning = warning && value >= warning.threshold;
+  const showWarning = warning && (
+    warning.direction === "below"
+      ? value <= warning.threshold
+      : value >= warning.threshold
+  );
   return (
     <div className="mb-5">
       <div className="flex justify-between items-baseline mb-2">
@@ -471,7 +475,7 @@ function App() {
       Object.keys(ew).forEach(k => { ew[k] /= total; });
     };
 
-    if (healthOfRecipient >= 9)         applyBoost('healthOfRecipient', 0.20);
+    if (healthOfRecipient <= 2)         applyBoost('healthOfRecipient', 0.20);
     if (ageOfRecipient >= 67)           applyBoost('ageOfRecipient', 0.15);
     if (childcareResponsibilities >= 9) applyBoost('childcareResponsibilities', 0.16);
 
@@ -481,7 +485,7 @@ function App() {
   // Build override summary for warning messages — maps key → { boostedTo, originalDefault }
   const overrideInfo = useMemo(() => {
     const info = {};
-    if (healthOfRecipient >= 9 && weights.healthOfRecipient < 0.20 && !manualOverrides.has('healthOfRecipient'))
+    if (healthOfRecipient <= 2 && weights.healthOfRecipient < 0.20 && !manualOverrides.has('healthOfRecipient'))
       info.healthOfRecipient = { boostedTo: Math.round(effectiveWeights.healthOfRecipient * 100) };
     if (ageOfRecipient >= 67 && weights.ageOfRecipient < 0.15 && !manualOverrides.has('ageOfRecipient'))
       info.ageOfRecipient = { boostedTo: Math.round(effectiveWeights.ageOfRecipient * 100) };
@@ -735,7 +739,8 @@ function App() {
               description="Poor health (low value) → Higher support | Good health → Lower support"
               rationale="Weighted at 9% under normal circumstances because health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 9–10), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case under A.R.S. § 25-319, and the weight is automatically increased to reflect this."
               warning={{
-                threshold: 9,
+                threshold: 2,
+                direction: "below",
                 message: `Weight increased to ${overrideInfo.healthOfRecipient ? overrideInfo.healthOfRecipient.boostedTo : 20}% — severe health limitations are treated as near-determinative. Consult an attorney about whether a long-term or permanent order may apply.`
               }}
             />
