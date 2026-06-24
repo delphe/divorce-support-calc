@@ -389,12 +389,19 @@ function App() {
   const [careerSacrifice, setCareerSacrifice] = useState(5);
 
   // Financial factors
-  const [assetsAwarded, setAssetsAwarded] = useState(0); // Currency value in dollars
+  const [recipientAssets, setRecipientAssets] = useState(0); // Total marital assets awarded to support recipient
+  const [payorAssets, setPayorAssets] = useState(0);         // Total marital assets awarded to support payor
   const [assetMode, setAssetMode] = useState('proportional'); // 'proportional' | 'exact'
   const [payorAbilityToPay, setPayorAbilityToPay] = useState(5);
 
   // Duration adjustment slider - allows user to shift duration/amount while keeping obligation constant
   const [adjustedDuration, setAdjustedDuration] = useState(null);
+
+  // Net asset offset: half the difference, because an equal split means each party gets half the total.
+  // The excess above that equal share is what offsets support.
+  // Positive = recipient received more than their fair share → reduces monthly support.
+  // Negative = recipient received less than their fair share → increases monthly support.
+  const assetsAwarded = (recipientAssets - payorAssets) / 2;
 
   // Default weights
   const DEFAULT_WEIGHTS = {
@@ -615,13 +622,26 @@ function App() {
   }, [assetMode, exactObligation, estimatedDuration]);
   const percentageInRange = ((estimatedMonthly - lowAmount) / (highAmount - lowAmount)) * 100;
 
-  // Calculate adjusted monthly amount based on duration slider (keeps total obligation constant)
+  // Duration slider extended bounds: hard minimum of 6 months, max is guideline high + 24 months
+  const sliderDurationMin = 6;
+  const sliderDurationMax = highDuration + 24;
+
+  // Calculate adjusted monthly amount based on duration slider (keeps total obligation constant),
+  // incorporating the net asset offset (already baked into estimatedMonthly / exactObligation).
   const adjustedMonthly = useMemo(() => {
-    if (adjustedDuration === null) return estimatedMonthly;
-    
-    const totalObligation = estimatedMonthly.toFixed(0) * estimatedDuration.toFixed(0);
-    return totalObligation / adjustedDuration;
-  }, [estimatedMonthly, estimatedDuration, adjustedDuration]);
+    // The "canonical" displayed monthly before any duration adjustment
+    const baseMonthly = assetMode === 'exact' && exactMonthly !== null ? exactMonthly : estimatedMonthly;
+
+    // If the slider hasn't been touched, always return the canonical monthly exactly (avoids float drift)
+    if (adjustedDuration === null) return baseMonthly;
+
+    // Total obligation to redistribute: exact mode already has offset subtracted; proportional has it baked into baseMonthly
+    const baseObligation = assetMode === 'exact' && exactObligation !== null
+      ? exactObligation
+      : estimatedMonthly * estimatedDuration;
+
+    return adjustedDuration > 0 ? baseObligation / adjustedDuration : baseMonthly;
+  }, [estimatedMonthly, estimatedDuration, adjustedDuration, assetMode, exactMonthly, exactObligation]);
 
   const SliderComponent = SliderComp;
   const AgeSliderComponent = AgeSliderComp;
@@ -801,46 +821,67 @@ function App() {
               rationale="Weighted at 8% because ability to pay functions more as a ceiling than a linear factor in judicial decisions — a judge will not award more than the payor can reasonably afford regardless of other factors. The relatively modest weight reflects that this constraint typically only becomes decisive when the payor's income is genuinely limited. In higher-income cases it is rarely the determining factor, while in lower-income cases it can cap the award significantly."
             />
             <CurrencyInputComponent
-              label="Net Asset Offset"
-              value={assetsAwarded}
-              onChange={setAssetsAwarded}
-              helpText="Enter a positive number if the recipient received more assets than the payor, negative if they received fewer."
-              rationale={assetMode === 'proportional'
-                ? "The asset offset is expressed as a percentage of the total guideline obligation (midpoint monthly × midpoint duration), capped at ±100%, and used to shift the estimated monthly amount toward the low or high end of the range."
-                : "The asset offset is subtracted directly from the total estimated obligation (estimated monthly × estimated duration). The resulting obligation is then divided by the estimated duration to produce a revised monthly amount."
-              }
+              label="Support Recipient's Total Marital Assets"
+              value={recipientAssets}
+              onChange={setRecipientAssets}
+              helpText="Total value of marital assets awarded to the support recipient."
+            />
+            <CurrencyInputComponent
+              label="Support Payor's Total Marital Assets"
+              value={payorAssets}
+              onChange={setPayorAssets}
+              helpText="Total value of marital assets awarded to the support payor."
             >
-              {/* Calculation mode toggle */}
-              <div className="mt-3 flex items-center gap-3">
-                <span className="text-xs font-semibold text-gray-600">Offset method:</span>
-                <button
-                  onClick={() => setAssetMode('proportional')}
-                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                    assetMode === 'proportional'
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
-                  }`}
-                >
-                  Proportional
-                </button>
-                <button
-                  onClick={() => setAssetMode('exact')}
-                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                    assetMode === 'exact'
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
-                  }`}
-                >
-                  Exact subtraction
-                </button>
-              </div>
-              {/* Exact mode result preview */}
-              {assetMode === 'exact' && assetsAwarded !== 0 && exactObligation !== null && (
-                <div className="mt-2 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 text-xs text-indigo-700">
-                  Adjusted obligation: <span className="font-semibold">${Math.round(exactObligation).toLocaleString('en-US')}</span>
-                  {' '}→ revised monthly: <span className="font-semibold">${Math.round(exactMonthly).toLocaleString('en-US')}</span> over <span className="font-semibold">{Math.round(estimatedDuration)} mo</span>
+              {/* Net offset display + mode toggle */}
+              <div className="mt-3 p-2.5 rounded bg-gray-50 border border-gray-200">
+                <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                  <span className="text-xs font-semibold text-gray-600">Net Asset Offset:</span>
+                  <span className={`text-sm font-bold ${assetsAwarded > 0 ? 'text-orange-600' : assetsAwarded < 0 ? 'text-green-700' : 'text-gray-500'}`}>
+                    {assetsAwarded > 0 ? '+' : assetsAwarded < 0 ? '−' : ''} ${Math.abs(assetsAwarded).toLocaleString('en-US')}
+                  </span>
                 </div>
-              )}
+                <p className="text-xs text-gray-500 mb-1">
+                  = (Recipient ${recipientAssets.toLocaleString('en-US')} − Payor ${payorAssets.toLocaleString('en-US')}) ÷ 2.
+                  Each party's fair share is half the total; the offset is the recipient's excess above that.
+                </p>
+                  {assetsAwarded > 0 && <span className="text-xs text-orange-500 w-full block mb-2">Recipient received more than their equal share → reduces monthly support</span>}
+                  {assetsAwarded < 0 && <span className="text-xs text-green-600 w-full block mb-2">Recipient received less than their equal share → increases monthly support</span>}
+                  {assetsAwarded === 0 && <span className="text-xs text-gray-400 w-full block mb-2">No offset — assets split equally</span>}
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-xs font-semibold text-gray-600">Offset method:</span>
+                  <button
+                    onClick={() => setAssetMode('proportional')}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                      assetMode === 'proportional'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                    }`}
+                  >
+                    Proportional
+                  </button>
+                  <button
+                    onClick={() => setAssetMode('exact')}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                      assetMode === 'exact'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                    }`}
+                  >
+                    Exact subtraction
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {assetMode === 'proportional'
+                    ? "Offset expressed as % of total guideline obligation, used to shift monthly amount within the range."
+                    : "Offset subtracted directly from total obligation, then divided by duration to produce revised monthly."}
+                </p>
+                {assetMode === 'exact' && assetsAwarded !== 0 && exactObligation !== null && (
+                  <div className="mt-2 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 text-xs text-indigo-700">
+                    Adjusted obligation: <span className="font-semibold">${Math.round(exactObligation).toLocaleString('en-US')}</span>
+                    {' '}→ revised monthly: <span className="font-semibold">${Math.round(exactMonthly).toLocaleString('en-US')}</span> over <span className="font-semibold">{Math.round(estimatedDuration)} mo</span>
+                  </div>
+                )}
+              </div>
             </CurrencyInputComponent>
           </div>
         </div>
@@ -892,22 +933,44 @@ function App() {
             <div className="relative">
               <input
                 type="range"
-                min={lowDuration}
-                max={highDuration}
+                min={sliderDurationMin}
+                max={sliderDurationMax}
                 value={adjustedDuration !== null ? adjustedDuration : estimatedDuration}
                 onChange={(e) => setAdjustedDuration(Number(e.target.value))}
                 className="w-full h-2 bg-white bg-opacity-30 rounded-lg appearance-none cursor-pointer accent-yellow-300"
               />
-              <div className="flex justify-between text-xs text-blue-100 mt-2">
-                <span>{lowDuration} mo</span>
-                <span>{highDuration} mo</span>
+              {/* Guideline min/max markers */}
+              <div className="relative w-full h-5 mt-1">
+                {[
+                  { val: lowDuration, label: `Guide min: ${lowDuration} mo` },
+                  { val: highDuration, label: `Guide max: ${highDuration} mo` },
+                ].map(({ val, label }) => {
+                  const pct = ((val - sliderDurationMin) / (sliderDurationMax - sliderDurationMin)) * 100;
+                  return (
+                    <div
+                      key={val}
+                      className="absolute flex flex-col items-center"
+                      style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}
+                    >
+                      <div className="w-0.5 h-3 bg-yellow-300 opacity-70" />
+                      <span className="text-yellow-200 text-xs whitespace-nowrap mt-0.5" style={{ fontSize: '10px' }}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-xs text-blue-200 mt-1">
+                <span>{sliderDurationMin} mo</span>
+                <span>{sliderDurationMax} mo</span>
               </div>
             </div>
             <p className="text-xs text-blue-100 mt-2">
-              Adjusted Monthly: <span className="font-semibold">${adjustedMonthly.toFixed(0)}</span> 
-              {adjustedDuration !== null && adjustedMonthly !== estimatedMonthly && 
-                <span className="ml-2">(Estimated: ${estimatedMonthly.toFixed(0)})</span>
-              }
+              Adjusted Monthly: <span className="font-semibold text-yellow-200">${adjustedMonthly.toFixed(0)}</span>
+              {assetsAwarded !== 0 && (
+                <span className="ml-2 opacity-75">(net asset offset of ${assetsAwarded > 0 ? '+' : ''}{assetsAwarded.toLocaleString('en-US')} included)</span>
+              )}
+              {adjustedDuration !== null && (
+                <span className="ml-2">(Base estimate: ${estimatedMonthly.toFixed(0)})</span>
+              )}
             </p>
           </div>
           <div className="mb-4">
