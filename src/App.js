@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import './App.css';
 
-const WeightSliderRow = ({
+const WeightSliderRow = React.memo(({
   keyName, label, basePct, effectivePct, defaultPct,
   isOverridden, isManual, dotColor, accentColor,
-  onChangeWeight, onRestoreAuto,
+  onChangeWeight, setManualOverrides,
 }) => (
   <div className="mb-3">
     <div className="flex justify-between items-center mb-1">
@@ -18,7 +18,7 @@ const WeightSliderRow = ({
         )}
         {isManual && !isOverridden && (
           <button
-            onClick={onRestoreAuto}
+            onClick={() => setManualOverrides(prev => { const n = new Set(prev); n.delete(keyName); return n; })}
             className="text-xs text-indigo-500 underline hover:text-indigo-700"
           >
             Restore auto
@@ -44,7 +44,156 @@ const WeightSliderRow = ({
       </p>
     )}
   </div>
-);
+));
+
+const CurrencyInputComponent = ({ label, value, onChange, helpText, rationale, children }) => {
+  const inputRef = React.useRef(null);
+  const [displayValue, setDisplayValue] = React.useState(String(value || ''));
+
+  const formatCurrency = (num) => {
+    if (!num) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 0, maximumFractionDigits: 0,
+    }).format(num);
+  };
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
+      <div className="relative">
+        <span className="absolute left-3 top-2 text-gray-600 font-semibold">$</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={displayValue}
+          onChange={(e) => setDisplayValue(e.target.value)}
+          onBlur={(e) => {
+            const num = parseInt(e.target.value.replace(/[^0-9-]/g, ''), 10);
+            const final = isNaN(num) ? 0 : num;
+            onChange(final);
+            setDisplayValue(formatCurrency(final).replace('$', ''));
+          }}
+          onFocus={() => setDisplayValue(value ? String(value) : '')}
+          placeholder="0"
+          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div className="mt-2">
+        {helpText && <p className="text-xs text-gray-600">{helpText}</p>}
+        {rationale && (
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 mt-2">
+            <span className="font-semibold">Calculation: </span>{rationale}
+          </p>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const WeightsPanel = React.memo(({
+  showWeightsPanel, setShowWeightsPanel,
+  weights, effectiveWeights, overrideInfo, manualOverrides,
+  DEFAULT_WEIGHTS, WEIGHT_LABELS, DONUT_COLORS,
+  handleWeightChange, setWeights, setManualOverrides,
+}) => {
+  const donutData = Object.keys(effectiveWeights).map((key, i) => ({
+    name: WEIGHT_LABELS[key],
+    value: Math.round(effectiveWeights[key] * 100),
+    color: DONUT_COLORS[i],
+    key,
+  }));
+
+  return (
+    <div className="mb-8">
+      <button
+        onClick={() => setShowWeightsPanel(v => !v)}
+        className="flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors mb-4"
+      >
+        <span>{showWeightsPanel ? '▼' : '▶'}</span>
+        Customize Factor Weights
+      </button>
+
+      {showWeightsPanel && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+          <div className="flex flex-col md:flex-row gap-8">
+
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Factor Weights</h3>
+                <button
+                  onClick={() => { setWeights(DEFAULT_WEIGHTS); setManualOverrides(new Set()); }}
+                  className="text-xs text-gray-500 hover:text-indigo-600 underline transition-colors"
+                >
+                  Reset to defaults
+                </button>
+              </div>
+
+              {Object.keys(weights).map((key, i) => {
+                const basePct = Math.round(weights[key] * 100);
+                const effectivePct = Math.round(effectiveWeights[key] * 100);
+                const defaultPct = Math.round(DEFAULT_WEIGHTS[key] * 100);
+                const isOverridden = !!overrideInfo[key];
+                const isAbove = effectivePct > defaultPct;
+                const isBelow = effectivePct < defaultPct;
+                const dotColor = isOverridden ? '#F59E0B' : isAbove ? DONUT_COLORS[i] : isBelow ? '#9CA3AF' : '#6B7280';
+                return (
+                  <WeightSliderRow
+                    key={key}
+                    keyName={key}
+                    label={WEIGHT_LABELS[key]}
+                    basePct={basePct}
+                    effectivePct={effectivePct}
+                    defaultPct={defaultPct}
+                    isOverridden={isOverridden}
+                    isManual={manualOverrides.has(key)}
+                    dotColor={dotColor}
+                    accentColor={isOverridden ? '#F59E0B' : DONUT_COLORS[i]}
+                    onChangeWeight={handleWeightChange}
+                    setManualOverrides={setManualOverrides}
+                  />
+                );
+              })}
+
+              <div className="mt-4 pt-3 border-t border-gray-300 flex justify-between text-xs text-gray-500">
+                <span>Total (effective)</span>
+                <span className="font-bold text-green-600">
+                  {Object.values(effectiveWeights).reduce((s, v) => s + Math.round(v * 100), 0)}%
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Min 2% · Max 40% per factor. Other weights adjust automatically.
+              </p>
+            </div>
+
+            <div className="md:w-64 flex flex-col items-center">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-2">Weight Distribution</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={donutData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2} dataKey="value">
+                    {donutData.map((entry) => <Cell key={entry.key} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(v, n) => [`${v}%`, n]} contentStyle={{ fontSize: '11px', borderRadius: '6px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="w-full mt-2 space-y-1">
+                {donutData.map((entry) => (
+                  <div key={entry.key} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                    <span className="flex-1">{entry.name}</span>
+                    <span className="font-semibold">{entry.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
 
 const SliderComp = ({ label, value, onChange, description, rationale, warning }) => {
   const showWarning = warning && value >= warning.threshold;
@@ -237,6 +386,7 @@ function App() {
 
   // Financial factors
   const [assetsAwarded, setAssetsAwarded] = useState(0); // Currency value in dollars
+  const [assetMode, setAssetMode] = useState('proportional'); // 'proportional' | 'exact'
   const [payorAbilityToPay, setPayorAbilityToPay] = useState(5);
 
   // Duration adjustment slider - allows user to shift duration/amount while keeping obligation constant
@@ -342,7 +492,7 @@ function App() {
 
   // Adjust one weight and redistribute the remainder proportionally.
   // Operates against effectiveWeights as the baseline so override-affected sliders respond correctly.
-  const handleWeightChange = (key, newValue) => {
+  const handleWeightChange = useCallback((key, newValue) => {
     const clamped = Math.max(0.02, Math.min(0.40, newValue));
     const delta = clamped - weights[key];
     const otherKeys = Object.keys(weights).filter(k => k !== key);
@@ -357,10 +507,9 @@ function App() {
     const total = Object.values(newWeights).reduce((s, v) => s + v, 0);
     Object.keys(newWeights).forEach(k => { newWeights[k] = newWeights[k] / total; });
 
-    // Mark this key as manually controlled so auto-override no longer floors it
     setManualOverrides(prev => new Set([...prev, key]));
     setWeights(newWeights);
-  };
+  }, [weights]);
 
   // Calculate the weighted adjustment factor (sliders only, excluding asset offset)
   const adjustmentFactor = useMemo(() => {
@@ -394,35 +543,27 @@ function App() {
 
   // Calculate estimated monthly amount with separate asset offset adjustment
   const estimatedMonthly = useMemo(() => {
-    // Step 1: Use the adjustment factor (from sliders) to interpolate between low and high
     const range = highAmount - lowAmount;
     const adjustment = (adjustmentFactor * range) / 2;
     let estimate = midAmount + adjustment;
-    
-    // Clamp slider estimate to range
     estimate = Math.max(lowAmount, Math.min(highAmount, estimate));
-    
-    // Step 2: Apply asset offset as a separate, independent adjustment
-    const midpointDuration = (lowDuration + highDuration) / 2;
-    const totalObligation = midAmount * midpointDuration;
-    
-    // Calculate offset percentage (capped at 100% in either direction)
-    const offsetPercentage = Math.max(-1, Math.min(1, assetsAwarded / totalObligation));
-    
-    // Apply asset offset adjustment
-    if (offsetPercentage > 0) {
-      // Positive offset (recipient got more assets) -> push toward LOW end
-      const adjustmentAmount = offsetPercentage * (estimate - lowAmount);
-      estimate -= adjustmentAmount;
-    } else if (offsetPercentage < 0) {
-      // Negative offset (recipient got fewer assets) -> push toward HIGH end
-      const adjustmentAmount = Math.abs(offsetPercentage) * (highAmount - estimate);
-      estimate += adjustmentAmount;
+
+    if (assetMode === 'proportional') {
+      // Proportional: express offset as % of total obligation, shift monthly amount
+      const midpointDuration = (lowDuration + highDuration) / 2;
+      const totalObligation = midAmount * midpointDuration;
+      const offsetPercentage = Math.max(-1, Math.min(1, assetsAwarded / totalObligation));
+      if (offsetPercentage > 0) {
+        estimate -= offsetPercentage * (estimate - lowAmount);
+      } else if (offsetPercentage < 0) {
+        estimate += Math.abs(offsetPercentage) * (highAmount - estimate);
+      }
+      return Math.max(lowAmount, Math.min(highAmount, estimate));
+    } else {
+      // Exact: return the slider-based estimate unchanged — exact subtraction is applied to total obligation
+      return estimate;
     }
-    
-    // Final clamp to ensure we stay within bounds
-    return Math.max(lowAmount, Math.min(highAmount, estimate));
-  }, [adjustmentFactor, lowAmount, midAmount, highAmount, assetsAwarded, lowDuration, highDuration]);
+  }, [adjustmentFactor, lowAmount, midAmount, highAmount, assetsAwarded, lowDuration, highDuration, assetMode]);
 
   // Calculate estimated duration
   const estimatedDuration = useMemo(() => {
@@ -455,7 +596,19 @@ function App() {
     return Math.max(lowDuration, Math.min(highDuration, estimate));
   }, [lengthOfMarriage, ageOfRecipient, healthOfRecipient, recipientEarning, educationNeeded, payorAbilityToPay, lowDuration, highDuration]);
 
-  // Calculate percentage within range for the visual bar
+  // In exact mode: subtract asset offset from total obligation, then re-derive monthly from estimated duration
+  const exactObligation = useMemo(() => {
+    if (assetMode !== 'exact') return null;
+    const rawObligation = estimatedMonthly * estimatedDuration;
+    const adjusted = rawObligation - assetsAwarded;
+    return Math.max(0, adjusted);
+  }, [assetMode, estimatedMonthly, estimatedDuration, assetsAwarded]);
+
+  // Monthly amount adjusted for exact mode (keeps duration fixed, reduces monthly)
+  const exactMonthly = useMemo(() => {
+    if (assetMode !== 'exact' || !exactObligation) return null;
+    return exactObligation / estimatedDuration;
+  }, [assetMode, exactObligation, estimatedDuration]);
   const percentageInRange = ((estimatedMonthly - lowAmount) / (highAmount - lowAmount)) * 100;
 
   // Calculate adjusted monthly amount based on duration slider (keeps total obligation constant)
@@ -469,181 +622,6 @@ function App() {
   const SliderComponent = SliderComp;
   const AgeSliderComponent = AgeSliderComp;
   const MarriageSliderComponent = MarriageSliderComp;
-
-  const CurrencyInputComponent = ({ label, value, onChange, description, helpText }) => {
-    const inputRef = React.useRef(null);
-    const [displayValue, setDisplayValue] = React.useState(String(value || ''));
-
-    const formatCurrency = (num) => {
-      if (!num) return '';
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(num);
-    };
-
-    const handleChange = (e) => {
-      const input = e.target.value;
-      // Keep raw input for immediate display while typing
-      setDisplayValue(input);
-    };
-
-    const handleBlur = (e) => {
-      const input = e.target.value;
-      // Remove currency formatting and parse on blur
-      const numValue = parseInt(input.replace(/[^0-9-]/g, ''), 10);
-      const finalValue = isNaN(numValue) ? 0 : numValue;
-      onChange(finalValue);
-      setDisplayValue(formatCurrency(finalValue).replace('$', ''));
-    };
-
-    const handleFocus = () => {
-      // When focused, show the raw value without formatting
-      setDisplayValue(value ? String(value) : '');
-    };
-
-    return (
-      <div className="mb-4">
-        <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
-        <div className="relative">
-          <span className="absolute left-3 top-2 text-gray-600 font-semibold">$</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={displayValue}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onFocus={handleFocus}
-            placeholder="0"
-            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="mt-2">
-          {helpText && <p className="text-xs text-gray-600">{helpText}</p>}
-          {description && <p className="text-xs text-gray-600 mt-1">{description}</p>}
-        </div>
-      </div>
-    );
-  };
-
-  // Donut chart data — uses effectiveWeights so overrides are visible in the chart
-  const donutData = Object.keys(effectiveWeights).map((key, i) => ({
-    name: WEIGHT_LABELS[key],
-    value: Math.round(effectiveWeights[key] * 100),
-    color: DONUT_COLORS[i],
-    key,
-    isOverridden: !!overrideInfo[key],
-  }));
-
-  const WeightsPanel = () => (
-    <div className="mb-8">
-      <button
-        onClick={() => setShowWeightsPanel(v => !v)}
-        className="flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors mb-4"
-      >
-        <span>{showWeightsPanel ? '▼' : '▶'}</span>
-        Customize Factor Weights
-      </button>
-
-      {showWeightsPanel && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <div className="flex flex-col md:flex-row gap-8">
-
-            {/* Sliders column */}
-            <div className="flex-1">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Factor Weights</h3>
-                <button
-                  onClick={() => { setWeights(DEFAULT_WEIGHTS); setManualOverrides(new Set()); }}
-                  className="text-xs text-gray-500 hover:text-indigo-600 underline transition-colors"
-                >
-                  Reset to defaults
-                </button>
-              </div>
-
-              {Object.keys(weights).map((key, i) => {
-                const basePct = Math.round(weights[key] * 100);
-                const effectivePct = Math.round(effectiveWeights[key] * 100);
-                const defaultPct = Math.round(DEFAULT_WEIGHTS[key] * 100);
-                const isOverridden = !!overrideInfo[key];
-                const isAbove = effectivePct > defaultPct;
-                const isBelow = effectivePct < defaultPct;
-                const dotColor = isOverridden ? '#F59E0B' : isAbove ? DONUT_COLORS[i] : isBelow ? '#9CA3AF' : '#6B7280';
-                return (
-                  <WeightSliderRow
-                    key={key}
-                    keyName={key}
-                    label={WEIGHT_LABELS[key]}
-                    basePct={basePct}
-                    effectivePct={effectivePct}
-                    defaultPct={defaultPct}
-                    isOverridden={isOverridden}
-                    isManual={manualOverrides.has(key)}
-                    dotColor={dotColor}
-                    accentColor={isOverridden ? '#F59E0B' : DONUT_COLORS[i]}
-                    onChangeWeight={handleWeightChange}
-                    onRestoreAuto={() => setManualOverrides(prev => { const n = new Set(prev); n.delete(key); return n; })}
-                  />
-                );
-              })}
-
-              <div className="mt-4 pt-3 border-t border-gray-300 flex justify-between text-xs text-gray-500">
-                <span>Total (effective)</span>
-                <span className="font-bold text-green-600">
-                  {Object.values(effectiveWeights).reduce((s, v) => s + Math.round(v * 100), 0)}%
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">
-                Min 2% · Max 40% per factor. Other weights adjust automatically.
-              </p>
-            </div>
-
-            {/* Donut chart column */}
-            <div className="md:w-64 flex flex-col items-center">
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-2">Weight Distribution</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={donutData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {donutData.map((entry) => (
-                      <Cell key={entry.key} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [`${value}%`, name]}
-                    contentStyle={{ fontSize: '11px', borderRadius: '6px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              {/* Legend */}
-              <div className="w-full mt-2 space-y-1">
-                {donutData.map((entry) => (
-                  <div key={entry.key} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span
-                      className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: entry.color }}
-                    />
-                    <span className="flex-1">{entry.name}</span>
-                    <span className="font-semibold">{entry.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
@@ -714,7 +692,20 @@ function App() {
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 mb-6">Step 2: Adjust Supporting Factors</h2>
 
-          <WeightsPanel />
+          <WeightsPanel
+            showWeightsPanel={showWeightsPanel}
+            setShowWeightsPanel={setShowWeightsPanel}
+            weights={weights}
+            effectiveWeights={effectiveWeights}
+            overrideInfo={overrideInfo}
+            manualOverrides={manualOverrides}
+            DEFAULT_WEIGHTS={DEFAULT_WEIGHTS}
+            WEIGHT_LABELS={WEIGHT_LABELS}
+            DONUT_COLORS={DONUT_COLORS}
+            handleWeightChange={handleWeightChange}
+            setWeights={setWeights}
+            setManualOverrides={setManualOverrides}
+          />
 
           {/* Recipient Factors */}
           <div className="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded">
@@ -808,9 +799,44 @@ function App() {
               label="Net Asset Offset"
               value={assetsAwarded}
               onChange={setAssetsAwarded}
-              helpText="Enter a positive number if the recipient received more assets than the payor, negative if they received fewer"
-              description="The total guideline obligation is calculated based on the midpoint monthly amount and duration. This asset offset is expressed as a percentage of that obligation (capped at ±100%) and adjusts the estimated support accordingly."
-            />
+              helpText="Enter a positive number if the recipient received more assets than the payor, negative if they received fewer."
+              rationale={assetMode === 'proportional'
+                ? "The asset offset is expressed as a percentage of the total guideline obligation (midpoint monthly × midpoint duration), capped at ±100%, and used to shift the estimated monthly amount toward the low or high end of the range."
+                : "The asset offset is subtracted directly from the total estimated obligation (estimated monthly × estimated duration). The resulting obligation is then divided by the estimated duration to produce a revised monthly amount."
+              }
+            >
+              {/* Calculation mode toggle */}
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-xs font-semibold text-gray-600">Offset method:</span>
+                <button
+                  onClick={() => setAssetMode('proportional')}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                    assetMode === 'proportional'
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                  }`}
+                >
+                  Proportional
+                </button>
+                <button
+                  onClick={() => setAssetMode('exact')}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                    assetMode === 'exact'
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                  }`}
+                >
+                  Exact subtraction
+                </button>
+              </div>
+              {/* Exact mode result preview */}
+              {assetMode === 'exact' && assetsAwarded !== 0 && exactObligation !== null && (
+                <div className="mt-2 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 text-xs text-indigo-700">
+                  Adjusted obligation: <span className="font-semibold">${Math.round(exactObligation).toLocaleString('en-US')}</span>
+                  {' '}→ revised monthly: <span className="font-semibold">${Math.round(exactMonthly).toLocaleString('en-US')}</span> over <span className="font-semibold">{Math.round(estimatedDuration)} mo</span>
+                </div>
+              )}
+            </CurrencyInputComponent>
           </div>
         </div>
 
@@ -821,9 +847,12 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div className="bg-white bg-opacity-20 backdrop-blur p-6 rounded-lg">
               <p className="text-blue-100 text-sm font-semibold mb-2">ESTIMATED MONTHLY AMOUNT</p>
-              <p className="text-5xl font-bold mb-2">${estimatedMonthly.toFixed(0)}</p>
+              <p className="text-5xl font-bold mb-2">${Math.round(assetMode === 'exact' && exactMonthly !== null ? exactMonthly : estimatedMonthly).toLocaleString('en-US')}</p>
               <p className="text-blue-100 text-xs">
                 Range: ${lowAmount.toFixed(0)} - ${highAmount.toFixed(0)}
+                {assetMode === 'exact' && exactMonthly !== null && assetsAwarded !== 0 && (
+                  <span className="block mt-0.5">Before offset: ${Math.round(estimatedMonthly).toLocaleString('en-US')}</span>
+                )}
               </p>
             </div>
 
@@ -837,9 +866,14 @@ function App() {
 
             <div className="bg-white bg-opacity-20 backdrop-blur p-6 rounded-lg">
               <p className="text-blue-100 text-sm font-semibold mb-2">TOTAL OBLIGATION</p>
-              <p className="text-5xl font-bold mb-2">${Math.round(estimatedMonthly.toFixed(0) * estimatedDuration.toFixed(0)).toLocaleString('en-US')}</p>
+              <p className="text-5xl font-bold mb-2">
+                ${Math.round(assetMode === 'exact' && exactObligation !== null ? exactObligation : estimatedMonthly * estimatedDuration).toLocaleString('en-US')}
+              </p>
               <p className="text-blue-100 text-xs">
                 Total amount over duration
+                {assetMode === 'exact' && assetsAwarded !== 0 && exactObligation !== null && (
+                  <span className="block mt-0.5">Before offset: ${Math.round(estimatedMonthly * estimatedDuration).toLocaleString('en-US')}</span>
+                )}
               </p>
             </div>
           </div>
