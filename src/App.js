@@ -874,8 +874,8 @@ function App() {
                 </div>
                 <p className="text-xs text-gray-500">
                   {assetMode === 'proportional'
-                    ? "Offset expressed as % of total guideline obligation, used to shift monthly amount within the range."
-                    : "Offset subtracted directly from total obligation, then divided by duration to produce revised monthly."}
+                    ? "Offset is divided by the midpoint monthly × midpoint duration to produce an offset percentage, capped at ±100%. If the recipient received more than their equal share, that percentage is used to pull the estimated monthly amount down toward the guideline low. If they received less, it pushes the monthly amount up toward the guideline high."
+                    : "Offset subtracted directly from total obligation, then divided by duration to produce revised monthly amount."}
                 </p>
                 {assetMode === 'exact' && assetsAwarded !== 0 && exactObligation !== null && (
                   <div className="mt-2 bg-indigo-50 border border-indigo-100 rounded px-2 py-1.5 text-xs text-indigo-700">
