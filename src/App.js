@@ -629,18 +629,20 @@ function App() {
   // Calculate adjusted monthly amount based on duration slider (keeps total obligation constant),
   // incorporating the net asset offset (already baked into estimatedMonthly / exactObligation).
   const adjustedMonthly = useMemo(() => {
-    // The "canonical" displayed monthly before any duration adjustment
-    const baseMonthly = assetMode === 'exact' && exactMonthly !== null ? exactMonthly : estimatedMonthly;
+    // Use the same rounded value that is displayed in the Estimated Monthly card,
+    // so that when no duration adjustment is active the two figures are bit-for-bit identical.
+    const displayedMonthly = Math.round(assetMode === 'exact' && exactMonthly !== null ? exactMonthly : estimatedMonthly);
 
-    // If the slider hasn't been touched, always return the canonical monthly exactly (avoids float drift)
-    if (adjustedDuration === null) return baseMonthly;
+    // If the slider hasn't been touched, return exactly the displayed value — no arithmetic, no drift.
+    if (adjustedDuration === null) return displayedMonthly;
 
-    // Total obligation to redistribute: exact mode already has offset subtracted; proportional has it baked into baseMonthly
+    // Total obligation anchored to the rounded displayed monthly × estimated duration,
+    // so redistributing back over the same duration always reproduces displayedMonthly exactly.
     const baseObligation = assetMode === 'exact' && exactObligation !== null
-      ? exactObligation
-      : estimatedMonthly * estimatedDuration;
+      ? Math.round(exactObligation)
+      : displayedMonthly * Math.round(estimatedDuration);
 
-    return adjustedDuration > 0 ? baseObligation / adjustedDuration : baseMonthly;
+    return adjustedDuration > 0 ? baseObligation / adjustedDuration : displayedMonthly;
   }, [estimatedMonthly, estimatedDuration, adjustedDuration, assetMode, exactMonthly, exactObligation]);
 
   const SliderComponent = SliderComp;
@@ -964,12 +966,12 @@ function App() {
               </div>
             </div>
             <p className="text-xs text-blue-100 mt-2">
-              Adjusted Monthly: <span className="font-semibold text-yellow-200">${adjustedMonthly.toFixed(0)}</span>
+              Adjusted Monthly: <span className="font-semibold text-yellow-200">${Math.round(adjustedMonthly).toLocaleString('en-US')}</span>
               {assetsAwarded !== 0 && (
-                <span className="ml-2 opacity-75">(net asset offset of ${assetsAwarded > 0 ? '+' : ''}{assetsAwarded.toLocaleString('en-US')} included)</span>
+                <span className="ml-2 opacity-75">(net asset offset of ${assetsAwarded > 0 ? '+' : ''}{Math.round(assetsAwarded).toLocaleString('en-US')} included)</span>
               )}
               {adjustedDuration !== null && (
-                <span className="ml-2">(Base estimate: ${estimatedMonthly.toFixed(0)})</span>
+                <span className="ml-2">(Base estimate: ${Math.round(estimatedMonthly).toLocaleString('en-US')})</span>
               )}
             </p>
           </div>
