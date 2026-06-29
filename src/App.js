@@ -291,14 +291,24 @@ const AgeSliderComp = ({ label, value, onChange, description, rationale, warning
           <span className="font-semibold">Calculation: </span>{rationale}
         </p>
       )}
-      {warning && value >= warning.threshold && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
-          <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
-          <p className="text-xs text-amber-800">
-            <span className="font-semibold">Weight override applied: </span>{warning.message}
-          </p>
-        </div>
-      )}
+      {(() => {
+        if (!warning) return null;
+        // Supports either a single {threshold, message} or an array of tiers.
+        // When multiple tiers apply, the highest threshold met is shown.
+        const tiers = Array.isArray(warning) ? warning : [warning];
+        const active = tiers
+          .filter(t => value >= t.threshold)
+          .sort((a, b) => b.threshold - a.threshold)[0];
+        if (!active) return null;
+        return (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded px-3 py-2 mt-2">
+            <span className="text-amber-500 text-sm mt-0.5">⚠️</span>
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Weight override applied: </span>{active.message}
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -484,6 +494,7 @@ function App() {
 
     if (healthOfRecipient <= 2)         applyBoost('healthOfRecipient', 0.20);
     if (ageOfRecipient >= 67)           applyBoost('ageOfRecipient', 0.15);
+    else if (ageOfRecipient >= 50)      applyBoost('ageOfRecipient', 0.12);
     if (childcareResponsibilities >= 9) applyBoost('childcareResponsibilities', 0.16);
 
     return ew;
@@ -495,6 +506,8 @@ function App() {
     if (healthOfRecipient <= 2 && weights.healthOfRecipient < 0.20 && !manualOverrides.has('healthOfRecipient'))
       info.healthOfRecipient = { boostedTo: Math.round(effectiveWeights.healthOfRecipient * 100) };
     if (ageOfRecipient >= 67 && weights.ageOfRecipient < 0.15 && !manualOverrides.has('ageOfRecipient'))
+      info.ageOfRecipient = { boostedTo: Math.round(effectiveWeights.ageOfRecipient * 100) };
+    else if (ageOfRecipient >= 50 && weights.ageOfRecipient < 0.12 && !manualOverrides.has('ageOfRecipient'))
       info.ageOfRecipient = { boostedTo: Math.round(effectiveWeights.ageOfRecipient * 100) };
     if (childcareResponsibilities >= 9 && weights.childcareResponsibilities < 0.16 && !manualOverrides.has('childcareResponsibilities'))
       info.childcareResponsibilities = { boostedTo: Math.round(effectiveWeights.childcareResponsibilities * 100) };
@@ -749,10 +762,16 @@ function App() {
               onChange={setAgeOfRecipient}
               description="Older age (harder to re-enter workforce) → Higher support | Younger age → Lower support"
               rationale="Default weight: 9% — Age is an important factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Its legal significance increases significantly past 50 and again at 67 when Social Security and retirement income attribution rules shift."
-              warning={{
-                threshold: 67,
-                message: `Weight increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 15}% — re-employment at this age is typically treated as unrealistic by courts, making this factor near-determinative.`
-              }}
+              warning={[
+                {
+                  threshold: 50,
+                  message: `Weight increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 12}% — courts increasingly recognize re-entry difficulty at this age, especially after a long marriage.`
+                },
+                {
+                  threshold: 67,
+                  message: `Weight increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 15}% — re-employment at this age is typically treated as unrealistic by courts, making this factor near-determinative.`
+                }
+              ]}
             />
             <SliderComponent
               label="Health of Recipient"
