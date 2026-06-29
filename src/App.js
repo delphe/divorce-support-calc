@@ -741,14 +741,14 @@ function App() {
               value={recipientEarning}
               onChange={setRecipientEarning}
               description="Low earning potential → Higher support amount & longer duration | High earning potential → Lower support amount & shorter duration"
-              rationale="Weighted at 14% — the highest of any single factor — because Arizona spousal maintenance is explicitly designed around self-sufficiency. Courts focus primarily on whether the recipient can support themselves, making this the most direct measure of ongoing need. A recipient with strong earning potential is expected to become self-sufficient quickly, reducing both the amount and duration of support."
+              rationale="Default weight: 14% — Arizona spousal maintenance is explicitly designed around self-sufficiency. Courts focus primarily on whether the recipient can support themselves, making this the most direct measure of ongoing need. A recipient with strong earning potential is expected to become self-sufficient quickly, reducing both the amount and duration of support."
             />
             <AgeSliderComponent
               label="Age of Recipient"
               value={ageOfRecipient}
               onChange={setAgeOfRecipient}
               description="Older age (harder to re-enter workforce) → Higher support | Younger age → Lower support"
-              rationale="Weighted at 9% because age is an important but secondary factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Its legal significance increases significantly past 50 and again at 67 when Social Security and retirement income attribution rules shift."
+              rationale="Default weight: 9% — Age is an important factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Its legal significance increases significantly past 50 and again at 67 when Social Security and retirement income attribution rules shift."
               warning={{
                 threshold: 67,
                 message: `Weight increased to ${overrideInfo.ageOfRecipient ? overrideInfo.ageOfRecipient.boostedTo : 15}% — re-employment at this age is typically treated as unrealistic by courts, making this factor near-determinative.`
@@ -759,7 +759,7 @@ function App() {
               value={healthOfRecipient}
               onChange={setHealthOfRecipient}
               description="Poor health (low value) → Higher support | Good health → Lower support"
-              rationale="Weighted at 9% under normal circumstances because health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 9–10), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case under A.R.S. § 25-319, and the weight is automatically increased to reflect this."
+              rationale="Default weight: 9% - Health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 9–10), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case under A.R.S. § 25-319, and the weight is automatically increased to reflect this."
               warning={{
                 threshold: 2,
                 direction: "below",
@@ -771,7 +771,7 @@ function App() {
               value={childcareResponsibilities}
               onChange={setChildcareResponsibilities}
               description="High childcare responsibilities limiting work → Higher support | Low responsibilities → Lower support"
-              rationale="Weighted at 7% because childcare is relevant but partially captured by other factors like earning potential. Its influence grows significantly when the recipient has primary custody of children under school age, since full-time care of young children can make employment practically impossible. At very high values (9–10), the weight is automatically increased to reflect this near-determinative impact."
+              rationale="Default weight: 7% - Childcare is relevant but partially captured by other factors like earning potential. Its influence grows significantly when the recipient has primary custody of children under school age, since full-time care of young children can make employment practically impossible. At very high values (9–10), the weight is automatically increased to reflect this near-determinative impact."
               warning={{
                 threshold: 9,
                 message: `Weight increased to ${overrideInfo.childcareResponsibilities ? overrideInfo.childcareResponsibilities.boostedTo : 16}% — primary custody of young children severely limits employment and courts treat this as a major self-sufficiency constraint. Duration may shorten as children reach school age.`
@@ -787,28 +787,28 @@ function App() {
               value={lengthOfMarriage}
               onChange={setLengthOfMarriage}
               description="Longer marriage → Higher support & duration | Shorter marriage → Lower support & duration. Under 5 years significantly reduces duration."
-              rationale="Weighted at 20% — the highest weight of any factor — because marriage length is the foundational driver of both the amount and duration of spousal maintenance under Arizona law. It underlies several other factors simultaneously: longer marriages involve more career sacrifice, a higher standard of living expectation, and greater dependency. The 2025 guideline revisions specifically increased the maximum duration for marriages over 16 years, reinforcing how central this factor is."
+              rationale="Default weight: 20% — Marriage length is the foundational driver of both the amount and duration of spousal maintenance under Arizona law. It underlies several other factors simultaneously: longer marriages involve more career sacrifice, a higher standard of living expectation, and greater dependency. The 2025 guideline revisions specifically increased the maximum duration for marriages over 16 years, reinforcing how central this factor is."
             />
             <SliderComponent
               label="Standard of Living During Marriage"
               value={standardOfLiving}
               onChange={setStandardOfLiving}
               description="Higher standard of living → Higher support | Lower standard → Lower support"
-              rationale="Weighted at 13% because Arizona courts explicitly consider the marital standard of living as the baseline against which support adequacy is measured. In higher-income marriages, courts use it to anchor the award to a lifestyle the recipient reasonably expected to maintain. However, it carries less weight in lower-income marriages where maintaining the exact standard is not realistic for either spouse post-divorce."
+              rationale="Default weight: 13% - Arizona courts explicitly consider the marital standard of living as the baseline against which support adequacy is measured. In higher-income marriages, courts use it to anchor the award to a lifestyle the recipient reasonably expected to maintain. However, it carries less weight in lower-income marriages where maintaining the exact standard is not realistic for either spouse post-divorce."
             />
             <SliderComponent
               label="Career Sacrifice"
               value={careerSacrifice}
               onChange={setCareerSacrifice}
               description="Significant career sacrifice for the marriage → Higher support | Minimal sacrifice → Lower support"
-              rationale="Weighted at 12% because career sacrifice is one of the clearest equitable justifications for spousal maintenance. A.R.S. § 25-319 specifically names a spouse's contribution to the other's educational or career opportunities as a basis for support. Judges look for concrete evidence — years out of the workforce, forgone degrees, geographic relocations, or reduced hours — and treat documented sacrifice as a strong argument for higher awards."
+              rationale="Default weight: 12% - Career sacrifice is one of the clearest equitable justifications for spousal maintenance. A.R.S. § 25-319 specifically names a spouse's contribution to the other's educational or career opportunities as a basis for support. Judges look for concrete evidence — years out of the workforce, forgone degrees, geographic relocations, or reduced hours — and treat documented sacrifice as a strong argument for higher awards."
             />
             <SliderComponent
               label="Education/Training Needed"
               value={educationNeeded}
               onChange={setEducationNeeded}
               description="More education or training needed → Higher support amount & longer duration | Little needed → Lower support & shorter duration"
-              rationale="Weighted at 8% for the monthly amount, but also directly influences estimated duration — more training needed means a longer runway to self-sufficiency. Courts may award maintenance specifically to fund a degree or vocational program, after which the expectation is self-sufficiency. This is why education needs tend to affect how long support lasts more than how much is paid each month."
+              rationale="Default weight: 8% - Directly influences estimated duration as well. More training needed means a longer runway to self-sufficiency. Courts may award maintenance specifically to fund a degree or vocational program, after which the expectation is self-sufficiency. This is why education needs tend to affect how long support lasts more than how much is paid each month."
             />
           </div>
 
@@ -820,7 +820,7 @@ function App() {
               value={payorAbilityToPay}
               onChange={setPayorAbilityToPay}
               description="Lower ability to pay → Lower support | Higher ability to pay → Higher support"
-              rationale="Weighted at 8% because ability to pay functions more as a ceiling than a linear factor in judicial decisions — a judge will not award more than the payor can reasonably afford regardless of other factors. The relatively modest weight reflects that this constraint typically only becomes decisive when the payor's income is genuinely limited. In higher-income cases it is rarely the determining factor, while in lower-income cases it can cap the award significantly."
+              rationale="Default weight: 8% - Ability to pay functions more as a ceiling than a linear factor in judicial decisions — a judge will not award more than the payor can reasonably afford regardless of other factors. The relatively modest weight reflects that this constraint typically only becomes decisive when the payor's income is genuinely limited. In higher-income cases it is rarely the determining factor, while in lower-income cases it can cap the award significantly."
             />
             <CurrencyInputComponent
               label="Support Recipient's Total Marital Assets"
