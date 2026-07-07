@@ -1009,7 +1009,18 @@ function App() {
           </div>
         </div>
 
+
         {/* Disclaimer */}
+        <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="font-semibold mb-2">If you found this calculator helpful, consider donating to support ongoing development.</p>
+          <a href="https://www.buymeacoffee.com/edwindelph" target="_blank" rel="noopener noreferrer">
+            <img
+              src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+              alt="Buy Me a Coffee"
+              style={{ height: '60px', width: '217px' }}
+            />
+          </a>
+        </div>
         <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded text-sm text-red-800">
           <p className="font-semibold mb-1">⚠️ Important Disclaimer</p>
           <p>
