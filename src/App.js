@@ -673,6 +673,12 @@ function App() {
           <p className="text-gray-600">
             Enter results from the <a className="underline text-blue-500" href="https://www.superiorcourt.maricopa.gov/app/selfsuffcalc/" target="_blank">Arizona Spousal Maintenance Calculator</a> and adjust factors to refine your estimate
           </p>
+          <p className="text-gray-600">
+            Child support in AZ is more straightforward to calculate. 
+          </p>
+          <p className="text-gray-600">
+            View <a className="underline text-blue-500" href="https://www.azcourts.gov/familylaw/child-support-calculator-information" target="_blank">Child Support Calculator Information</a> on the AZ Courts website for more details.
+          </p>
         </div>
 
         {/* Input Section */}
