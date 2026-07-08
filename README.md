@@ -47,7 +47,7 @@ You don't have to ever use `eject`. The curated feature set is suitable for smal
 
 ## Deployment
 
-Run `npm run build` and rename the build folder to docs. Then push to main branch to deploy to GitHub pages.
+Run `npm run build` which should outpot to the docs folder. Then push to main branch to deploy to GitHub pages.
 
 ## Learn More
 

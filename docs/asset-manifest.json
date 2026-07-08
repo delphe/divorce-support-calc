@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/divorce-support-calc/static/css/main.be159042.css",
-    "main.js": "/divorce-support-calc/static/js/main.b7f461df.js",
+    "main.css": "/divorce-support-calc/static/css/main.18a450e6.css",
+    "main.js": "/divorce-support-calc/static/js/main.2d7566e9.js",
     "static/js/453.afb03982.chunk.js": "/divorce-support-calc/static/js/453.afb03982.chunk.js",
     "index.html": "/divorce-support-calc/index.html",
-    "main.be159042.css.map": "/divorce-support-calc/static/css/main.be159042.css.map",
-    "main.b7f461df.js.map": "/divorce-support-calc/static/js/main.b7f461df.js.map",
+    "main.18a450e6.css.map": "/divorce-support-calc/static/css/main.18a450e6.css.map",
+    "main.2d7566e9.js.map": "/divorce-support-calc/static/js/main.2d7566e9.js.map",
     "453.afb03982.chunk.js.map": "/divorce-support-calc/static/js/453.afb03982.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.be159042.css",
-    "static/js/main.b7f461df.js"
+    "static/css/main.18a450e6.css",
+    "static/js/main.2d7566e9.js"
   ]
 }
