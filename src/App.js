@@ -767,7 +767,7 @@ function App() {
               value={ageOfRecipient}
               onChange={setAgeOfRecipient}
               description="Older age (harder to re-enter workforce) → Higher support | Younger age → Lower support"
-              rationale="Default weight: 9% — Age is an important factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Its legal significance increases significantly past 50 and again at 67 when Social Security and retirement income attribution rules shift."
+              rationale="Default weight: 9% — Age is an important factor — it influences earning potential rather than determining support on its own. Courts recognize that older recipients face real barriers re-entering the workforce after a long marriage, but age alone is not determinative. Commonly recognized benchmarks in family law practice are past 50 and again at 67 when Social Security and retirement income attribution rules shift."
               warning={[
                 {
                   threshold: 50,
@@ -784,7 +784,7 @@ function App() {
               value={healthOfRecipient}
               onChange={setHealthOfRecipient}
               description="Poor health (low value) → Higher support | Good health → Lower support"
-              rationale="Default weight: 9% - Health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 9–10), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case under A.R.S. § 25-319, and the weight is automatically increased to reflect this."
+              rationale="Default weight: 9% - Health is significant but courts cannot always verify medical claims without documentation. When health is severely compromised (slider at 1–2), it becomes near-determinative — a recipient who cannot work due to illness or disability is treated similarly to a permanent disability case, and the weight is automatically increased to reflect this."
               warning={{
                 threshold: 2,
                 direction: "below",
@@ -812,21 +812,21 @@ function App() {
               value={lengthOfMarriage}
               onChange={setLengthOfMarriage}
               description="Longer marriage → Higher support & duration | Shorter marriage → Lower support & duration. Under 5 years significantly reduces duration."
-              rationale="Default weight: 20% — Marriage length is the foundational driver of both the amount and duration of spousal maintenance under Arizona law. It underlies several other factors simultaneously: longer marriages involve more career sacrifice, a higher standard of living expectation, and greater dependency. The 2025 guideline revisions specifically increased the maximum duration for marriages over 16 years, reinforcing how central this factor is."
+              rationale="Default weight: 20% — Marriage length is the foundational driver of both the amount and duration of spousal maintenance under Arizona law. The 2025 guideline revisions specifically increased the maximum duration for marriages over 16 years, reinforcing how central this factor is."
             />
             <SliderComponent
               label="Standard of Living During Marriage"
               value={standardOfLiving}
               onChange={setStandardOfLiving}
               description="Higher standard of living → Higher support | Lower standard → Lower support"
-              rationale="Default weight: 13% - Arizona courts explicitly consider the marital standard of living as the baseline against which support adequacy is measured. In higher-income marriages, courts use it to anchor the award to a lifestyle the recipient reasonably expected to maintain. However, it carries less weight in lower-income marriages where maintaining the exact standard is not realistic for either spouse post-divorce."
+              rationale="Default weight: 13% - In higher-income marriages, courts use it to anchor the award to a lifestyle the recipient reasonably expected to maintain. However, it carries less weight in lower-income marriages where maintaining the exact standard is not realistic for either spouse post-divorce."
             />
             <SliderComponent
               label="Career Sacrifice"
               value={careerSacrifice}
               onChange={setCareerSacrifice}
               description="Significant career sacrifice for the marriage → Higher support | Minimal sacrifice → Lower support"
-              rationale="Default weight: 12% - Career sacrifice is one of the clearest equitable justifications for spousal maintenance. A.R.S. § 25-319 specifically names a spouse's contribution to the other's educational or career opportunities as a basis for support. Judges look for concrete evidence — years out of the workforce, forgone degrees, geographic relocations, or reduced hours — and treat documented sacrifice as a strong argument for higher awards."
+              rationale="Default weight: 12% - Career sacrifice is a clear equitable justifications for spousal maintenance. A.R.S. § 25-319 specifically names a spouse's contribution to the other's educational or career opportunities as a basis for support. Judges look for concrete evidence — years out of the workforce, forgone degrees, geographic relocations, or reduced hours — and treat documented sacrifice as a strong argument for higher awards."
             />
             <SliderComponent
               label="Education/Training Needed"
@@ -1031,6 +1031,26 @@ function App() {
           <p className="font-semibold mb-1">⚠️ Important Disclaimer</p>
           <p>
             This tool is an educational estimate only and is NOT legal advice. These calculations are based on general Arizona spousal maintenance guidelines and should not be relied upon for actual divorce proceedings. Consult with a family law attorney in Arizona for accurate legal guidance tailored to your specific situation. Extraordinary circumstances may apply to your case that this tool cannot account for.
+          </p>
+          <p>
+            Sources include{' '}
+            <a
+              className="underline text-red-700 hover:text-red-900"
+              href="https://www.azleg.gov/ars/25/00319.htm"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              A.R.S. § 25-319
+            </a>{' '}
+            and{' '}
+            <a
+              className="underline text-red-700 hover:text-red-900"
+              href="https://www.azcourts.gov/Portals/0/22/admorder/Orders25/2025-101.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Arizona Supreme Court Admin. Order 2025-101
+            </a> but a lot of this was generated by AI and may not be fully accurate. Always verify with official sources and consult a qualified attorney.
           </p>
         </div>
       </div>
